@@ -6,9 +6,11 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents and the initial project structure. It does not yet include the desktop app, local sidecar, capture workers, SQLite implementation, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, and the first SQLite migration foundation. It does not yet include the desktop app, local sidecar runtime, capture workers, end-to-end session storage, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
+
+MVP 0 now also includes a Python 3.13 SQLite migration foundation with WAL mode for local persistence.
 
 ## What It Is
 

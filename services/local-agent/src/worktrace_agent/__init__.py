@@ -1,0 +1,1 @@
+"""WorkTrace local agent foundation."""

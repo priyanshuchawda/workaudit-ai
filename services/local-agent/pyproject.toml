@@ -1,0 +1,29 @@
+[project]
+name = "worktrace-local-agent"
+version = "0.0.0"
+description = "Local Python 3.13 storage and agent foundation for WorkTrace AI."
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.409,<2",
+  "pytest>=9.0.0,<10",
+  "ruff>=0.15.0,<0.16",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

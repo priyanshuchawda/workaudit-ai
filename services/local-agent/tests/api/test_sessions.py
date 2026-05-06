@@ -54,6 +54,36 @@ def test_start_stop_and_list_session_events(tmp_path: Path) -> None:
     assert events[0]["metadata"]["app"] == "VS Code"
 
 
+def test_latest_session_events_returns_most_recent_session_events(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            recorder_poll_interval_seconds=0.01,
+        )
+    )
+
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+        },
+    )
+    client.post(
+        "/sessions/sess_api_001/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+
+    response = client.get("/sessions/latest/events")
+
+    assert response.status_code == 200
+    events = response.json()["events"]
+    assert len(events) == 1
+    assert events[0]["session_id"] == "sess_api_001"
+    assert events[0]["metadata"]["app"] == "VS Code"
+
+
 def test_stop_unknown_session_returns_safe_error(tmp_path: Path) -> None:
     client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
 

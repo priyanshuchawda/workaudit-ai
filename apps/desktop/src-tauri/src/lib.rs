@@ -6,6 +6,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             commands::sidecar::get_sidecar_health,
+            commands::sidecar::get_session_events,
             commands::sidecar::start_sidecar,
             commands::sidecar::stop_sidecar
         ])

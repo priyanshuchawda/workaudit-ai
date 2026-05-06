@@ -38,6 +38,8 @@ MVP 1E now includes a deterministic Python timeline chunker that turns raw event
 
 MVP 1E now includes deterministic Markdown export with evidence references plus the existing redacted raw JSON export path.
 
+MVP 1F now includes typed local model availability and fallback states so deterministic recording, timeline, and export paths can run without an AI model installed. This does not implement local model loading or LLM report generation yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

@@ -3,8 +3,8 @@ export type RawTimelineEvent = {
   timestamp: string;
   app: string;
   windowTitle: string;
-  source: "active_window";
-  type: "active_window_changed";
+  source: "active_window" | "file_watcher";
+  type: "active_window_changed" | "file_changed";
 };
 
 export const rawTimelineSimulationEvents: RawTimelineEvent[] = [

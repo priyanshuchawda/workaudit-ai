@@ -149,6 +149,43 @@ test("shows real sidecar active-window events when available", async () => {
   ]);
 });
 
+test("shows real sidecar file watcher events when available", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  const sidecarEvents: SessionEventsResult = {
+    status: "available",
+    events: [
+      {
+        id: "evt_file_001",
+        timestamp: "2026-05-06T09:15:00+05:30",
+        app: "File change",
+        windowTitle: "modified C:/repo/src/app.py",
+        source: "file_watcher",
+        type: "file_changed",
+      },
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  };
+  getSessionEventsMock.mockResolvedValue(sidecarEvents);
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+  const items = within(timeline).getAllByRole("listitem");
+
+  expect(items).toHaveLength(2);
+  expect(items.map((item) => item.textContent)).toEqual([
+    expect.stringContaining("09:14VS Codeactive_windowworkaudit-ai - App.tsx"),
+    expect.stringContaining("09:15File changefile_watchermodified C:/repo/src/app.py"),
+  ]);
+});
+
 test("shows safe missing-sidecar timeline state before falling back to fixtures", async () => {
   getSidecarHealthMock.mockResolvedValue(missingSidecar);
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });

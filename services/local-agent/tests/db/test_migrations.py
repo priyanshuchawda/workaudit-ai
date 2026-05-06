@@ -44,16 +44,23 @@ def test_initialize_database_enables_wal_mode(tmp_path: Path) -> None:
 def test_fresh_database_applies_initial_migration(tmp_path: Path) -> None:
     connection = initialize_database(tmp_path / "worktrace.sqlite")
     try:
-        assert get_applied_migrations(connection) == ["001_initial.sql", "002_screenshots.sql"]
+        assert get_applied_migrations(connection) == [
+            "001_initial.sql",
+            "002_screenshots.sql",
+            "003_ocr_results.sql",
+        ]
         assert table_exists(connection, "schema_migrations")
         assert table_exists(connection, "sessions")
         assert table_exists(connection, "raw_events")
         assert table_exists(connection, "screenshots")
+        assert table_exists(connection, "ocr_results")
         assert index_exists(connection, "idx_raw_events_session_timestamp")
         assert index_exists(connection, "idx_raw_events_type")
         assert index_exists(connection, "idx_raw_events_source")
         assert index_exists(connection, "idx_screenshots_session_timestamp")
         assert index_exists(connection, "idx_screenshots_content_hash")
+        assert index_exists(connection, "idx_ocr_results_session_timestamp")
+        assert index_exists(connection, "idx_ocr_results_screenshot")
     finally:
         connection.close()
 
@@ -62,10 +69,14 @@ def test_apply_migrations_is_idempotent(tmp_path: Path) -> None:
     connection = initialize_database(tmp_path / "worktrace.sqlite")
     try:
         assert apply_migrations(connection) == []
-        assert get_applied_migrations(connection) == ["001_initial.sql", "002_screenshots.sql"]
+        assert get_applied_migrations(connection) == [
+            "001_initial.sql",
+            "002_screenshots.sql",
+            "003_ocr_results.sql",
+        ]
 
         migration_count = connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-        assert migration_count == 2
+        assert migration_count == 3
     finally:
         connection.close()
 
@@ -116,7 +127,7 @@ def test_database_with_initial_migration_remains_readable_on_upgrade(tmp_path: P
 
     reopened = open_database(db_path)
     try:
-        assert apply_migrations(reopened) == ["002_screenshots.sql"]
+        assert apply_migrations(reopened) == ["002_screenshots.sql", "003_ocr_results.sql"]
         row = reopened.execute(
             "SELECT id, status FROM sessions WHERE id = ?", ("sess_001",)
         ).fetchone()
@@ -124,6 +135,7 @@ def test_database_with_initial_migration_remains_readable_on_upgrade(tmp_path: P
         assert row["id"] == "sess_001"
         assert row["status"] == "stopped"
         assert table_exists(reopened, "screenshots")
+        assert table_exists(reopened, "ocr_results")
     finally:
         reopened.close()
 
@@ -151,9 +163,14 @@ def test_application_schema_is_defined_in_versioned_sql_migrations() -> None:
     migrations_dir = Path(__file__).parents[2] / "src" / "worktrace_agent" / "db" / "migrations"
     migration_files = sorted(migrations_dir.glob("*.sql"))
 
-    assert [path.name for path in migration_files] == ["001_initial.sql", "002_screenshots.sql"]
+    assert [path.name for path in migration_files] == [
+        "001_initial.sql",
+        "002_screenshots.sql",
+        "003_ocr_results.sql",
+    ]
 
     migration_sql = "\n".join(path.read_text(encoding="utf-8") for path in migration_files)
     assert "CREATE TABLE sessions" in migration_sql
     assert "CREATE TABLE raw_events" in migration_sql
     assert "CREATE TABLE screenshots" in migration_sql
+    assert "CREATE TABLE ocr_results" in migration_sql

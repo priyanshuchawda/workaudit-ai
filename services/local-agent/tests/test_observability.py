@@ -106,10 +106,11 @@ def test_debug_bundle_includes_safe_summaries_and_no_test_secrets(tmp_path: Path
     assert "raw clipboard should not ship" not in bundle_text
     assert "full prompt should not ship" not in bundle_text
     assert bundle["app"]["version"] == __version__
-    assert bundle["database"]["schema_version"] == "002_screenshots.sql"
+    assert bundle["database"]["schema_version"] == "003_ocr_results.sql"
     assert bundle["database"]["applied_migrations"] == [
         "001_initial.sql",
         "002_screenshots.sql",
+        "003_ocr_results.sql",
     ]
     assert bundle["jobs"] == {"status": "not_implemented"}
     assert bundle["models"] == {"status": "not_loaded"}

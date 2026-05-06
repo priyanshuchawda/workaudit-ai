@@ -42,6 +42,8 @@ MVP 1F now includes typed local model availability and fallback states so determ
 
 MVP 1F now includes an evidence-cited local LLM report generation foundation with prompt construction, Pydantic output validation, invalid JSON retry, and hallucination guards. This uses a local model client contract only; no real model runtime, model download, or report UI is implemented yet.
 
+MVP 2A now includes a selective OCR worker foundation that processes changed high-value screenshot candidates, redacts OCR text, and stores OCR results with screenshot evidence links. This uses a fakeable OCR engine contract only; live PaddleOCR integration is not implemented yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

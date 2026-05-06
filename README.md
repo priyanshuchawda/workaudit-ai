@@ -28,6 +28,8 @@ MVP 1C now includes a Python screenshot sampler policy with duplicate skipping, 
 
 MVP 1C now includes Python normalization helpers for file operation events and redacted terminal command events stored as raw events. This is not a live file watcher or terminal hook yet.
 
+MVP 1D now includes foundational privacy policy decisions, prompt/export/log redaction helpers, and screenshot deletion that removes SQLite references and files under a session artifact root. This is not a complete privacy system yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

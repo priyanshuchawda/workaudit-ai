@@ -1,6 +1,15 @@
 import sqlite3
+from dataclasses import dataclass
+from pathlib import Path
 
 from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
+
+
+@dataclass(frozen=True)
+class ScreenshotDeletionResult:
+    deleted_files: int
+    missing_files: int
+    deleted_rows: int
 
 
 def save_screenshot(connection: sqlite3.Connection, screenshot: ScreenshotArtifact) -> None:
@@ -66,6 +75,40 @@ def list_screenshots(connection: sqlite3.Connection, session_id: str) -> list[Sc
     return [_screenshot_from_row(row) for row in rows]
 
 
+def delete_screenshots_for_session(
+    connection: sqlite3.Connection,
+    *,
+    session_id: str,
+    artifact_root: Path,
+) -> ScreenshotDeletionResult:
+    screenshots = list_screenshots(connection, session_id)
+    resolved_root = artifact_root.resolve()
+    targets = [
+        _resolve_artifact_path(resolved_root=resolved_root, storage_path=screenshot.storage_path)
+        for screenshot in screenshots
+    ]
+
+    deleted_files = 0
+    missing_files = 0
+    for target in targets:
+        if not target.exists():
+            missing_files += 1
+            continue
+        if not target.is_file():
+            raise ValueError("screenshot artifact path is not a file")
+        target.unlink()
+        deleted_files += 1
+
+    with connection:
+        cursor = connection.execute("DELETE FROM screenshots WHERE session_id = ?", (session_id,))
+
+    return ScreenshotDeletionResult(
+        deleted_files=deleted_files,
+        missing_files=missing_files,
+        deleted_rows=cursor.rowcount,
+    )
+
+
 def _screenshot_from_row(row: sqlite3.Row) -> ScreenshotArtifact:
     return ScreenshotArtifact(
         id=str(row["id"]),
@@ -81,3 +124,12 @@ def _screenshot_from_row(row: sqlite3.Row) -> ScreenshotArtifact:
         visual_hash=str(row["visual_hash"]),
         storage_path=str(row["storage_path"]),
     )
+
+
+def _resolve_artifact_path(*, resolved_root: Path, storage_path: str) -> Path:
+    target = (resolved_root / storage_path).resolve()
+    try:
+        target.relative_to(resolved_root)
+    except ValueError as error:
+        raise ValueError("screenshot artifact path is outside artifact root") from error
+    return target

@@ -37,7 +37,33 @@ The following paths are critical for building Native Windows C++ projects withou
 - **Unit Tests**: `build\tests\Debug\unit_tests.exe`
 
 ## Other Important Environment Paths
-- **Python**: `C:\Python314\` and `C:\Python314\Scripts\`
+- **Project Python**: Python 3.13.12 at `C:\Python313\python.exe`
+- **Project pip**: pip 26.1.1 at `C:\Python313\Lib\site-packages\pip`
+- **Project Python Scripts**: `C:\Python313\Scripts\`
+- **Other installed Python versions**:
+  - Python 3.14 at `C:\Python314\python.exe`
+  - Python 3.11 at `C:\Users\Admin\AppData\Local\Programs\Python\Python311\python.exe`
+- **Python launcher default**: `py` defaults to Python 3.13.12
+- **PATH Python**: `where.exe python` resolves first to `C:\Python313\python.exe`
+- **uv**: `uv 0.10.7`
+- **Python workflow**: use `uv` by default for local-agent development.
+- **uv runtime note**: plain `uv run python --version` currently resolves to Python 3.11.11, so project commands should use `uv run --python 3.13 ...` until the Python version is pinned in `services/local-agent/pyproject.toml`.
+- **Python 3.13 compatibility proof**: local test environment `.venv313` successfully installed and imported FastAPI, Pydantic, SQLAlchemy, aiosqlite, pytest, ruff, pyright, Torch CPU, PaddlePaddle, PaddleOCR, and faster-whisper on Python 3.13.12.
+- **Verified Python package versions from local proof**:
+  - `fastapi==0.136.1`
+  - `pydantic==2.13.3`
+  - `sqlalchemy==2.0.49`
+  - `aiosqlite==0.22.1`
+  - `pytest==9.0.3`
+  - `ruff==0.15.12`
+  - `pyright==1.1.409`
+  - `torch==2.11.0+cpu`
+  - `torchvision==0.26.0+cpu`
+  - `torchaudio==2.11.0+cpu`
+  - `paddlepaddle==3.3.1`
+  - `paddleocr==3.5.0`
+  - `faster-whisper==1.2.1`
+  - `onnxruntime==1.25.1`
 - **Java Home**: `C:\Program Files\Eclipse Adoptium\jdk-17.0.15.6-hotspot`
 - **Android Home**: `C:\Android`
 - **Go Path**: `C:\Users\Admin\go`

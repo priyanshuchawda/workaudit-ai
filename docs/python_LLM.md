@@ -77,7 +77,10 @@ Follow these rules strictly:
 
 All Python code must follow:
 
-- Use Python 3.11+ style typing.
+- Target Python 3.13 for this project.
+- Use Python 3.13-compatible modern typing.
+- Use `uv` as the default Python environment and command runner.
+- Use `uv run --python 3.13 ...` until the local-agent `pyproject.toml` pins Python 3.13.
 - Use `dataclass`, `TypedDict`, or Pydantic models where useful.
 - Avoid untyped dictionaries at important boundaries.
 - Avoid global mutable state.
@@ -702,26 +705,26 @@ Do not combine refactor + feature + dependency upgrades unless explicitly planne
 Before saying work is complete, run or request these:
 
 ```bash
-uv run ruff format .
-uv run ruff check .
-uv run pyright
-uv run pytest
-uv run pip-audit
-uv run bandit -r src
+uv run --python 3.13 ruff format .
+uv run --python 3.13 ruff check .
+uv run --python 3.13 pyright
+uv run --python 3.13 pytest
+uv run --python 3.13 pip-audit
+uv run --python 3.13 bandit -r src
 ```
 
 For FastAPI apps, also run:
 
 ```bash
-uv run pytest tests/integration
-uv run pytest tests/api
+uv run --python 3.13 pytest tests/integration
+uv run --python 3.13 pytest tests/api
 ```
 
 For ML/LLM changes, also run:
 
 ```bash
-uv run python scripts/evaluate_model.py
-uv run pytest tests/ml_evals
+uv run --python 3.13 python scripts/evaluate_model.py
+uv run --python 3.13 pytest tests/ml_evals
 ```
 
 If any command cannot be run, clearly say:
@@ -823,12 +826,12 @@ Acceptance criteria:
 <exact expected behavior>
 
 Validation:
-- uv run ruff format .
-- uv run ruff check .
-- uv run pyright
-- uv run pytest
-- uv run pip-audit
-- uv run bandit -r src
+- uv run --python 3.13 ruff format .
+- uv run --python 3.13 ruff check .
+- uv run --python 3.13 pyright
+- uv run --python 3.13 pytest
+- uv run --python 3.13 pip-audit
+- uv run --python 3.13 bandit -r src
 
 Final response must include:
 - What changed

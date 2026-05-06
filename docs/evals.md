@@ -20,4 +20,7 @@ uv run --python 3.13 python scripts/evaluate_model.py
 
 The current runner uses 20 compact local golden sessions and prints a reproducible Markdown benchmark table. Latency, RAM, and storage columns are deterministic estimates for regression tracking only; real Windows resource-budget enforcement is handled separately.
 
+The current portfolio-facing aggregate result is recorded in `eval-results.md`.
+Re-run the command before updating public metrics.
+
 The first implementation work should create reliable event truth before AI evals. Later evals must verify that timelines, blockers, workflow steps, and reports are grounded in cited session evidence.

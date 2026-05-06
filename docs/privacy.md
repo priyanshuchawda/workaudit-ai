@@ -10,4 +10,11 @@ WorkTrace is planned as local-first software:
 - redaction before AI prompts or exports
 - deletion controls are planned before advanced AI features
 
-The recorder will handle sensitive desktop context, so privacy is a product requirement, not a later polish step. Phase 0 only documents this policy; it does not implement capture, redaction, storage, exports, or deletion yet.
+Implemented foundations now include redaction helpers, redacted Markdown/raw JSON
+exports, local rotating logs, redacted debug bundle output, and tests against a
+known privacy corpus. The live recorder and complete privacy center are still
+not implemented.
+
+The recorder will handle sensitive desktop context, so privacy is a product
+requirement, not a later polish step. Public demos should show privacy limits
+and deletion plans before discussing advanced AI behavior.

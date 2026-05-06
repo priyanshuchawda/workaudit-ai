@@ -54,6 +54,29 @@ MVP 4 now includes 20 compact golden sessions and a deterministic eval runner th
 
 MVP 4 now includes deterministic recording resource budget checks and a fake 30-minute recording budget simulation for CPU, RAM, DB growth, screenshot storage, and model-loaded policy. This is not yet real Windows capture profiling.
 
+## Two-Minute Review
+
+WorkTrace AI is a local-first desktop recorder and evidence timeline project. The implemented repo currently proves the foundations: typed contracts, SQLite WAL migrations, fake session storage/export, a Tauri shell, sidecar health, deterministic timeline/export/report foundations, model fallback states, selective AI-worker contracts, workflow debugging rules, golden evals, and deterministic resource budget checks.
+
+The project is still a foundation/demo repo. It is not a live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
+
+## Evidence and Verification
+
+- Shared schema tests validate event, session, timeline, finding, report, privacy, confidence, evidence ID, and model metadata contracts.
+- Python tests validate storage, migrations, fake sessions, session state, privacy redaction, exports, timeline chunks, report guards, optional AI-worker contracts, workflow debugger rules, golden evals, and resource budgets.
+- Desktop tests validate the status shell, sidecar health states, recovery banner preview, and raw timeline preview.
+- `docs/eval-results.md` records the reproducible golden-session eval command and current aggregate result.
+- `docs/sample-report.md` shows a deterministic evidence-cited sample report from local fixture-style data.
+
+## Current Limitations
+
+- Live Windows capture workers are not wired into an end-to-end recorder.
+- The desktop app is a shell and preview UI, not the finished recorder dashboard.
+- Python sidecar packaging is not bundled into the installer yet.
+- Local model runtimes and model downloads are not integrated.
+- Installer output is not code-signed and not production-distributed yet.
+- Resource budget checks use deterministic fake samples, not a live Windows recording benchmark.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

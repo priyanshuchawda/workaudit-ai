@@ -10,6 +10,7 @@
     "test": "vitest run",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "package:windows": "tauri build --bundles nsis",
     "tauri": "tauri"
   },
   "dependencies": {

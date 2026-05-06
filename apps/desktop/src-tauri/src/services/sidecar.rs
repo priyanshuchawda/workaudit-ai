@@ -130,9 +130,7 @@ impl SidecarService {
             events: response
                 .events
                 .into_iter()
-                .filter(|event| {
-                    event.source == "active_window" && event.event_type == "active_window_changed"
-                })
+                .filter(is_timeline_event)
                 .map(SessionTimelineEvent::from)
                 .collect(),
         }
@@ -157,26 +155,55 @@ fn unavailable_events() -> SessionEventsResult {
 
 impl From<SidecarRawEvent> for SessionTimelineEvent {
     fn from(event: SidecarRawEvent) -> Self {
-        let app = event
-            .metadata
-            .get("app")
-            .and_then(Value::as_str)
-            .unwrap_or("Unknown app");
-        let window_title = event
-            .metadata
-            .get("window_title")
-            .and_then(Value::as_str)
-            .unwrap_or("Untitled window");
+        let (app, window_title) = timeline_display_text(&event);
 
         Self {
             id: redact_text(&event.id),
             timestamp: redact_text(&event.timestamp),
-            app: redact_text(app),
-            window_title: redact_text(window_title),
+            app,
+            window_title,
             source: event.source,
             event_type: event.event_type,
         }
     }
+}
+
+fn is_timeline_event(event: &SidecarRawEvent) -> bool {
+    matches!(
+        (event.source.as_str(), event.event_type.as_str()),
+        ("active_window", "active_window_changed") | ("file_watcher", "file_changed")
+    )
+}
+
+fn timeline_display_text(event: &SidecarRawEvent) -> (String, String) {
+    if event.source == "file_watcher" && event.event_type == "file_changed" {
+        let operation = event
+            .metadata
+            .get("operation")
+            .and_then(Value::as_str)
+            .unwrap_or("changed");
+        let path = event
+            .metadata
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown path");
+        return (
+            "File change".to_string(),
+            redact_text(&format!("{operation} {path}")),
+        );
+    }
+
+    let app = event
+        .metadata
+        .get("app")
+        .and_then(Value::as_str)
+        .unwrap_or("Unknown app");
+    let window_title = event
+        .metadata
+        .get("window_title")
+        .and_then(Value::as_str)
+        .unwrap_or("Untitled window");
+    (redact_text(app), redact_text(window_title))
 }
 
 #[derive(Debug)]

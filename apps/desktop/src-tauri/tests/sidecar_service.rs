@@ -65,7 +65,7 @@ fn command_exposes_safe_session_events_fallback() {
 }
 
 #[test]
-fn events_load_active_window_changes_from_local_sidecar() {
+fn events_load_timeline_events_from_local_sidecar() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
     let port = listener.local_addr().expect("read local addr").port();
     let handle = thread::spawn(move || {
@@ -75,7 +75,7 @@ fn events_load_active_window_changes_from_local_sidecar() {
         let request_text = String::from_utf8_lossy(&request[..read_count]);
         assert!(request_text.starts_with("GET /sessions/sess_bridge_001/events HTTP/1.1"));
 
-        let body = r#"{"events":[{"id":"evt_live_001","session_id":"sess_bridge_001","timestamp":"2026-05-06T09:14:00+05:30","source":"active_window","type":"active_window_changed","privacy_level":"safe","confidence":0.98,"metadata":{"app":"VS Code","window_title":"workaudit-ai GITHUB_TOKEN=ghp_test","process_name":"Code.exe"}},{"id":"evt_terminal_001","session_id":"sess_bridge_001","timestamp":"2026-05-06T09:15:00+05:30","source":"terminal","type":"command","privacy_level":"safe","confidence":0.90,"metadata":{"app":"Terminal","window_title":"ignored","process_name":"pwsh.exe"}}]}"#;
+        let body = r#"{"events":[{"id":"evt_live_001","session_id":"sess_bridge_001","timestamp":"2026-05-06T09:14:00+05:30","source":"active_window","type":"active_window_changed","privacy_level":"safe","confidence":0.98,"metadata":{"app":"VS Code","window_title":"workaudit-ai GITHUB_TOKEN=ghp_test","process_name":"Code.exe"}},{"id":"evt_file_001","session_id":"sess_bridge_001","timestamp":"2026-05-06T09:15:00+05:30","source":"file_watcher","type":"file_changed","privacy_level":"safe","confidence":1.0,"metadata":{"path":"C:/repo/src/app.py","operation":"modified","file_name":"app.py","extension":".py"}},{"id":"evt_terminal_001","session_id":"sess_bridge_001","timestamp":"2026-05-06T09:16:00+05:30","source":"terminal","type":"command","privacy_level":"safe","confidence":0.90,"metadata":{"app":"Terminal","window_title":"ignored","process_name":"pwsh.exe"}}]}"#;
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             body.len(),
@@ -94,9 +94,13 @@ fn events_load_active_window_changes_from_local_sidecar() {
     handle.join().expect("join local server");
 
     assert_eq!(result.status, SessionEventsStatus::Available);
-    assert_eq!(result.events.len(), 1);
+    assert_eq!(result.events.len(), 2);
     assert_eq!(result.events[0].app, "VS Code");
     assert_eq!(result.events[0].window_title, "workaudit-ai [REDACTED]");
+    assert_eq!(result.events[1].app, "File change");
+    assert_eq!(result.events[1].window_title, "modified C:/repo/src/app.py");
+    assert_eq!(result.events[1].source, "file_watcher");
+    assert_eq!(result.events[1].event_type, "file_changed");
 }
 
 #[test]

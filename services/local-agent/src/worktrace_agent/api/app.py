@@ -8,6 +8,7 @@ from worktrace_agent.api.routes.health import router as health_router
 from worktrace_agent.api.routes.sessions import router as sessions_router
 from worktrace_agent.api.session_recorder_service import SessionRecorderService
 from worktrace_agent.capture.active_window import ActiveWindowProvider
+from worktrace_agent.capture.file_watcher import FileSnapshotProvider
 from worktrace_agent.capture.screenshot_capture import ScreenshotProvider
 
 
@@ -23,8 +24,10 @@ def create_app(
     db_path: Path | None = None,
     active_window_provider: ActiveWindowProvider | None = None,
     screenshot_provider: ScreenshotProvider | None = None,
+    file_snapshot_provider: FileSnapshotProvider | None = None,
     recorder_poll_interval_seconds: float = 1,
     screenshot_interval_seconds: float = 5,
+    file_watch_interval_seconds: float = 1,
 ) -> FastAPI:
     app = FastAPI(
         title="WorkTrace Local Agent",
@@ -34,8 +37,10 @@ def create_app(
         db_path=db_path or _default_db_path(),
         active_window_provider=active_window_provider,
         screenshot_provider=screenshot_provider,
+        file_snapshot_provider=file_snapshot_provider,
         recorder_poll_interval_seconds=recorder_poll_interval_seconds,
         screenshot_interval_seconds=screenshot_interval_seconds,
+        file_watch_interval_seconds=file_watch_interval_seconds,
     )
     app.include_router(health_router)
     app.include_router(sessions_router)

@@ -24,7 +24,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "real Windows active-window polling" in readme
     assert "Tauri event bridge requires a configured localhost sidecar URL" in readme
     assert "real Windows screenshot capture" in readme
-    assert "file watcher, terminal capture, OCR, and model runtimes are still not live" in readme
+    assert "metadata-only file watcher capture" in readme
+    assert "terminal capture, OCR, and model runtimes are still not live" in readme
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme
 

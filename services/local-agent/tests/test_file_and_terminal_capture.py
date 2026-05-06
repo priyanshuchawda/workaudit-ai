@@ -43,7 +43,8 @@ def test_sensitive_file_event_is_marked_sensitive() -> None:
     )
 
     assert event.privacy_level == "sensitive"
-    assert event.metadata["file_name"] == ".env"
+    assert event.metadata["file_name"] == "[REDACTED]"
+    assert event.metadata["path"] == "C:/Users/Admin/Desktop/screen-ai/[REDACTED]"
 
 
 def test_invalid_file_operation_is_rejected() -> None:

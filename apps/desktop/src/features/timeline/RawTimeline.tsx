@@ -25,7 +25,7 @@ export function RawTimeline({ events, sourceStatus }: RawTimelineProps) {
         </div>
         <p className="max-w-2xl text-sm leading-6 text-zinc-700">
           {isLive
-            ? "Active-window changes loaded from the local sidecar event stream."
+            ? "Active-window and file-change events loaded from the local sidecar event stream."
             : "The local sidecar event stream is unavailable, so this preview is using deterministic fixture events."}
         </p>
       </div>

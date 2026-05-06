@@ -23,6 +23,7 @@ class StartSessionRequest(BaseModel):
     title: str | None = None
     storage_path: str | None = None
     privacy_mode: str = Field(default="standard", min_length=1)
+    file_watch_roots: list[str] = Field(default_factory=list)
 
 
 class StopSessionRequest(BaseModel):
@@ -92,6 +93,7 @@ async def start_recording_session(
             title=request_body.title,
             storage_path=request_body.storage_path,
             privacy_mode=request_body.privacy_mode,
+            file_watch_roots=request_body.file_watch_roots,
         )
     except SessionTransitionError as error:
         status_code, detail = map_session_error(error)

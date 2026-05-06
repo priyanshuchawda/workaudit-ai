@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from worktrace_agent.api.app import create_app
 from worktrace_agent.capture.active_window import ActiveWindowSnapshot
+from worktrace_agent.capture.file_watcher import FileSnapshot
 from worktrace_agent.capture.screenshot_capture import ScreenshotProvider
 from worktrace_agent.capture.screenshot_sampler import ScreenshotFrame
 
@@ -30,6 +32,16 @@ class StaticScreenshotProvider(ScreenshotProvider):
             height=8,
             rgb_bytes=bytes([80, 80, 80]) * 8 * 8,
         )
+
+
+class SequenceFileSnapshotProvider:
+    def __init__(self, snapshots: list[list[FileSnapshot]]) -> None:
+        self._snapshots = list(snapshots)
+
+    def snapshot(self, roots: Sequence[Path]) -> list[FileSnapshot]:
+        if not self._snapshots:
+            return []
+        return self._snapshots.pop(0)
 
 
 def test_start_stop_and_list_session_events(tmp_path: Path) -> None:
@@ -65,6 +77,48 @@ def test_start_stop_and_list_session_events(tmp_path: Path) -> None:
     assert events[0]["source"] == "active_window"
     assert events[0]["type"] == "active_window_changed"
     assert events[0]["metadata"]["app"] == "VS Code"
+
+
+def test_session_start_stops_file_watcher_when_roots_are_configured(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    file_path = project_root / "src" / "app.py"
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            file_snapshot_provider=SequenceFileSnapshotProvider(
+                [
+                    [],
+                    [FileSnapshot(path=file_path, size=20, modified_ns=20)],
+                ]
+            ),
+            recorder_poll_interval_seconds=0.01,
+            file_watch_interval_seconds=0.01,
+        )
+    )
+
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_files_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+            "file_watch_roots": [str(project_root)],
+        },
+    )
+    client.post(
+        "/sessions/sess_api_files_001/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+    events_response = client.get("/sessions/sess_api_files_001/events")
+
+    assert events_response.status_code == 200
+    file_events = [
+        event for event in events_response.json()["events"] if event["source"] == "file_watcher"
+    ]
+    assert len(file_events) == 1
+    assert file_events[0]["type"] == "file_changed"
+    assert file_events[0]["metadata"]["operation"] == "created"
+    assert file_events[0]["metadata"]["path"].endswith("src/app.py")
 
 
 def test_start_stop_list_and_delete_session_screenshots(tmp_path: Path) -> None:

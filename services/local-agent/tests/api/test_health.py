@@ -13,7 +13,7 @@ def test_health_returns_sidecar_status() -> None:
     assert response.json() == {
         "app_name": "worktrace-local-agent",
         "app_version": __version__,
-        "schema_version": "001_initial.sql",
+        "schema_version": "002_screenshots.sql",
         "status": "ok",
     }
 

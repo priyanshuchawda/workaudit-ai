@@ -12,6 +12,8 @@ MVP 0 now includes shared contract schemas for events, sessions, reports, eviden
 
 MVP 0 now also includes a Python 3.13 SQLite migration foundation with WAL mode for local persistence.
 
+MVP 0 now includes a fake-session validation, SQLite round-trip, and redacted raw JSON export proof.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

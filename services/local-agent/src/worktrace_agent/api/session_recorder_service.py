@@ -88,10 +88,29 @@ class SessionRecorderService:
             )
 
     def list_session_events(self, *, session_id: str) -> list[RawEvent]:
-        return list_raw_events(self._connection, session_id)
+        resolved_session_id = self._resolve_session_id(session_id)
+        if resolved_session_id is None:
+            return []
+        return list_raw_events(self._connection, resolved_session_id)
 
     def close(self) -> None:
         self._connection.close()
+
+    def _resolve_session_id(self, session_id: str) -> str | None:
+        if session_id != "latest":
+            return session_id
+
+        row = self._connection.execute(
+            """
+            SELECT id
+            FROM sessions
+            ORDER BY started_at DESC, created_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        return str(row["id"])
 
 
 def map_session_error(error: SessionTransitionError) -> tuple[int, str]:

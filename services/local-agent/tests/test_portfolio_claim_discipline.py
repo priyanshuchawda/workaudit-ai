@@ -22,6 +22,7 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "## Evidence and Verification" in readme
     assert "## Current Limitations" in readme
     assert "real Windows active-window polling" in readme
+    assert "Tauri event bridge requires a configured localhost sidecar URL" in readme
     assert (
         "screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live"
         in readme

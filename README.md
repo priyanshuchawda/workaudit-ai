@@ -8,6 +8,8 @@ Planning + Phase 0 foundation. Not production-ready yet.
 
 This repository currently contains planning documents and the initial project structure. It does not yet include the desktop app, local sidecar, capture workers, SQLite implementation, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
 
+MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

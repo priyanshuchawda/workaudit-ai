@@ -1,4 +1,5 @@
 import sqlite3
+from collections.abc import Iterable
 
 from worktrace_agent.domain.session_state import (
     SessionRecord,
@@ -116,6 +117,28 @@ def interrupt_session(
     return interrupted
 
 
+def list_sessions_by_status(
+    connection: sqlite3.Connection,
+    statuses: Iterable[SessionStatus],
+) -> list[SessionRecord]:
+    status_values = tuple(status.value for status in statuses)
+    if not status_values:
+        return []
+
+    placeholders = ",".join("?" for _ in status_values)
+    rows = connection.execute(
+        f"""
+        SELECT id, started_at, ended_at, status, title, storage_path, privacy_mode
+        FROM sessions
+        WHERE status IN ({placeholders})
+        ORDER BY started_at ASC, id ASC
+        """,
+        status_values,
+    ).fetchall()
+
+    return [_session_from_row(row) for row in rows]
+
+
 def _persist_status(connection: sqlite3.Connection, session: SessionRecord) -> None:
     with connection:
         connection.execute(
@@ -149,6 +172,10 @@ def _load_session(connection: sqlite3.Connection, session_id: str) -> SessionRec
     if row is None:
         return None
 
+    return _session_from_row(row)
+
+
+def _session_from_row(row: sqlite3.Row) -> SessionRecord:
     return SessionRecord(
         id=str(row["id"]),
         started_at=str(row["started_at"]),

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+import { RecoveryBanner } from "./features/recovery/RecoveryBanner";
+import { recoverySimulationSessions } from "./features/recovery/recovery-simulation";
 import { RawTimeline } from "./features/timeline/RawTimeline";
 import { rawTimelineSimulationEvents } from "./features/timeline/raw-timeline-simulation";
 import { getSidecarHealth, startSidecar, stopSidecar, type SidecarHealth } from "./lib/tauri-client";
@@ -166,6 +168,8 @@ function App() {
             </article>
           ))}
         </section>
+
+        <RecoveryBanner sessions={recoverySimulationSessions} />
 
         <RawTimeline events={rawTimelineSimulationEvents} />
       </section>

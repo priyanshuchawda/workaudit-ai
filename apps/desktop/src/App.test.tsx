@@ -104,3 +104,18 @@ test("shows ordered raw active window timeline changes", async () => {
     expect.stringContaining("09:24File Exploreractive_windowworktrace session folder"),
   ]);
 });
+
+test("shows interrupted session recovery actions", async () => {
+  getSidecarHealthMock.mockResolvedValue(missingSidecar);
+
+  render(<App />);
+
+  const recovery = screen.getByRole("region", { name: "Interrupted session recovery" });
+
+  expect(within(recovery).getByText("Interrupted session found")).toBeInTheDocument();
+  expect(within(recovery).getByText("Interrupted review")).toBeInTheDocument();
+  expect(within(recovery).getByText("1 event preserved")).toBeInTheDocument();
+  expect(within(recovery).getByRole("button", { name: "Review" })).toBeInTheDocument();
+  expect(within(recovery).getByRole("button", { name: "Export" })).toBeInTheDocument();
+  expect(within(recovery).getByRole("button", { name: "Delete" })).toBeInTheDocument();
+});

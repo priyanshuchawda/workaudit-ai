@@ -30,6 +30,8 @@ MVP 1C now includes Python normalization helpers for file operation events and r
 
 MVP 1D now includes foundational privacy policy decisions, prompt/export/log redaction helpers, and screenshot deletion that removes SQLite references and files under a session artifact root. This is not a complete privacy system yet.
 
+MVP 1D now includes crash recovery helpers that mark active sessions as interrupted, keep partial raw events readable, and show an initial interrupted-session banner preview. This is not live crash monitoring yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

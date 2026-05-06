@@ -5,6 +5,7 @@ description = "Local Python 3.13 storage and agent foundation for WorkTrace AI."
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.136.1,<1",
+    "pydantic>=2.13.3,<3",
 ]
 
 [dependency-groups]

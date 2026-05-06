@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
 PRIVACY_TEST_CORPUS = (
@@ -39,3 +40,20 @@ def redact_json_value(value: Any) -> Any:
             for key, item in cast(dict[object, object], value).items()
         }
     return value
+
+
+def redact_for_prompt(value: Any) -> Any:
+    return redact_json_value(value)
+
+
+def redact_for_export(value: Any) -> Any:
+    return redact_json_value(value)
+
+
+def redact_for_log(value: str) -> str:
+    return redact_text(value)
+
+
+def count_privacy_leaks(value: Any) -> int:
+    serialized = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
+    return sum(secret in serialized for secret in PRIVACY_TEST_CORPUS + SECRET_VALUES)

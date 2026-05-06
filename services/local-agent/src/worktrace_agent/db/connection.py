@@ -11,7 +11,7 @@ def open_database(db_path: Path) -> sqlite3.Connection:
     resolved_path = Path(db_path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
-    connection = sqlite3.connect(resolved_path)
+    connection = sqlite3.connect(resolved_path, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute(f"PRAGMA busy_timeout = {DEFAULT_BUSY_TIMEOUT_MS};")
     connection.execute("PRAGMA journal_mode = WAL;")

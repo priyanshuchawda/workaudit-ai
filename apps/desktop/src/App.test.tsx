@@ -2,13 +2,16 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
+  getSessionEvents,
   getSidecarHealth,
   startSidecar,
   stopSidecar,
+  type SessionEventsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
 vi.mock("./lib/tauri-client", () => ({
+  getSessionEvents: vi.fn(),
   getSidecarHealth: vi.fn(),
   startSidecar: vi.fn(),
   stopSidecar: vi.fn(),
@@ -36,10 +39,13 @@ const healthySidecar: SidecarHealth = {
 };
 
 const getSidecarHealthMock = vi.mocked(getSidecarHealth);
+const getSessionEventsMock = vi.mocked(getSessionEvents);
 const startSidecarMock = vi.mocked(startSidecar);
 const stopSidecarMock = vi.mocked(stopSidecar);
 
 beforeEach(() => {
+  getSessionEventsMock.mockReset();
+  getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
   getSidecarHealthMock.mockReset();
   startSidecarMock.mockReset();
   stopSidecarMock.mockReset();
@@ -92,7 +98,7 @@ test("shows ordered raw active window timeline changes", async () => {
 
   render(<App />);
 
-  const timeline = screen.getByRole("region", { name: "Raw timeline simulation" });
+  const timeline = screen.getByRole("region", { name: "Raw timeline" });
   const items = within(timeline).getAllByRole("listitem");
 
   expect(items).toHaveLength(5);
@@ -103,6 +109,60 @@ test("shows ordered raw active window timeline changes", async () => {
     expect.stringContaining("09:22VS Codeactive_windowraw_events_repository.py"),
     expect.stringContaining("09:24File Exploreractive_windowworktrace session folder"),
   ]);
+});
+
+test("shows real sidecar active-window events when available", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  const sidecarEvents: SessionEventsResult = {
+    status: "available",
+    events: [
+      {
+        id: "evt_live_002",
+        timestamp: "2026-05-06T09:16:00+05:30",
+        app: "Chrome",
+        windowTitle: "Issue #51",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  };
+  getSessionEventsMock.mockResolvedValue(sidecarEvents);
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+  const items = within(timeline).getAllByRole("listitem");
+
+  expect(within(timeline).getByText("Live sidecar events")).toBeInTheDocument();
+  expect(items).toHaveLength(2);
+  expect(items.map((item) => item.textContent)).toEqual([
+    expect.stringContaining("09:14VS Codeactive_windowworkaudit-ai - App.tsx"),
+    expect.stringContaining("09:16Chromeactive_windowIssue #51"),
+  ]);
+});
+
+test("shows safe missing-sidecar timeline state before falling back to fixtures", async () => {
+  getSidecarHealthMock.mockResolvedValue(missingSidecar);
+  getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+
+  expect(within(timeline).getByText("Fixture fallback")).toBeInTheDocument();
+  expect(
+    within(timeline).getByText(
+      "The local sidecar event stream is unavailable, so this preview is using deterministic fixture events.",
+    ),
+  ).toBeInTheDocument();
 });
 
 test("shows interrupted session recovery actions", async () => {

@@ -9,10 +9,24 @@ export type SidecarHealth = {
   message: string;
 };
 
+export type SessionTimelineEvent = {
+  id: string;
+  timestamp: string;
+  app: string;
+  windowTitle: string;
+  source: "active_window";
+  type: "active_window_changed";
+};
+
+export type SessionEventsResult =
+  | { status: "available"; events: SessionTimelineEvent[] }
+  | { status: "unavailable"; events: [] };
+
 const SIDE_CAR_COMMANDS = {
   health: "get_sidecar_health",
   start: "start_sidecar",
   stop: "stop_sidecar",
+  sessionEvents: "get_session_events",
 } as const;
 
 const UNHEALTHY_FALLBACK: SidecarHealth = {
@@ -32,6 +46,14 @@ export async function startSidecar(): Promise<SidecarHealth> {
 
 export async function stopSidecar(): Promise<SidecarHealth> {
   return invokeSidecarCommand(SIDE_CAR_COMMANDS.stop);
+}
+
+export async function getSessionEvents(sessionId = "latest"): Promise<SessionEventsResult> {
+  try {
+    return await invoke<SessionEventsResult>(SIDE_CAR_COMMANDS.sessionEvents, { sessionId });
+  } catch {
+    return { status: "unavailable", events: [] };
+  }
 }
 
 async function invokeSidecarCommand(command: string): Promise<SidecarHealth> {

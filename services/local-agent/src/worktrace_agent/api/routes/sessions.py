@@ -9,6 +9,7 @@ from worktrace_agent.api.session_recorder_service import (
     SessionRecorderService,
     map_session_error,
 )
+from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
 from worktrace_agent.db.session_state_repository import SessionTransitionError
 from worktrace_agent.domain.raw_event import RawEvent
 from worktrace_agent.domain.session_state import SessionRecord
@@ -51,6 +52,31 @@ class RawEventResponse(BaseModel):
 
 class SessionEventsResponse(BaseModel):
     events: list[RawEventResponse]
+
+
+class ScreenshotResponse(BaseModel):
+    id: str
+    session_id: str
+    source_event_id: str | None
+    timestamp: str
+    width: int
+    height: int
+    stored_width: int
+    stored_height: int
+    byte_size: int
+    content_hash: str
+    visual_hash: str
+    storage_path: str
+
+
+class SessionScreenshotsResponse(BaseModel):
+    screenshots: list[ScreenshotResponse]
+
+
+class DeleteScreenshotsResponse(BaseModel):
+    deleted_files: int
+    missing_files: int
+    deleted_rows: int
 
 
 @router.post("/start", response_model=SessionResponse)
@@ -102,6 +128,34 @@ async def list_recording_session_events(session_id: str, request: Request) -> Se
     )
 
 
+@router.get("/{session_id}/screenshots", response_model=SessionScreenshotsResponse)
+async def list_recording_session_screenshots(
+    session_id: str,
+    request: Request,
+) -> SessionScreenshotsResponse:
+    service = _session_service(request)
+    return SessionScreenshotsResponse(
+        screenshots=[
+            _screenshot_response(screenshot)
+            for screenshot in service.list_session_screenshots(session_id=session_id)
+        ]
+    )
+
+
+@router.delete("/{session_id}/screenshots", response_model=DeleteScreenshotsResponse)
+async def delete_recording_session_screenshots(
+    session_id: str,
+    request: Request,
+) -> DeleteScreenshotsResponse:
+    service = _session_service(request)
+    result = service.delete_session_screenshots(session_id=session_id)
+    return DeleteScreenshotsResponse(
+        deleted_files=result.deleted_files,
+        missing_files=result.missing_files,
+        deleted_rows=result.deleted_rows,
+    )
+
+
 def _session_service(request: Request) -> SessionRecorderService:
     return cast(SessionRecorderService, request.app.state.session_recorder_service)
 
@@ -128,4 +182,21 @@ def _raw_event_response(event: RawEvent) -> RawEventResponse:
         privacy_level=event.privacy_level,
         confidence=event.confidence,
         metadata=event.metadata,
+    )
+
+
+def _screenshot_response(screenshot: ScreenshotArtifact) -> ScreenshotResponse:
+    return ScreenshotResponse(
+        id=screenshot.id,
+        session_id=screenshot.session_id,
+        source_event_id=screenshot.source_event_id,
+        timestamp=screenshot.timestamp,
+        width=screenshot.width,
+        height=screenshot.height,
+        stored_width=screenshot.stored_width,
+        stored_height=screenshot.stored_height,
+        byte_size=screenshot.byte_size,
+        content_hash=screenshot.content_hash,
+        visual_hash=screenshot.visual_hash,
+        storage_path=screenshot.storage_path,
     )

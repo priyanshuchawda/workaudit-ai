@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-oriented desktop shell, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, and a first real Windows active-window polling loop in the Python sidecar. It does not yet include screenshot capture, file watcher capture, terminal capture, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-oriented desktop shell, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, a first real Windows active-window polling loop, and real Windows screenshot capture with artifact storage in the Python sidecar. It does not yet include file watcher capture, terminal capture, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -28,7 +28,7 @@ MVP 1B now includes real Windows active-window polling in the Python sidecar, wi
 
 MVP 1B now includes a Tauri `get_session_events` command that can load active-window events from a configured localhost Python sidecar URL and otherwise returns a safe unavailable state so the desktop can fall back to fixture preview data.
 
-MVP 1C now includes a Python screenshot sampler policy with duplicate skipping, 5-second interval defaults, 1280px width metadata, hourly storage caps, and SQLite screenshot metadata. This is not live OS screenshot capture yet.
+MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, and safe screenshot deletion under the session artifact root. OCR is not implemented yet.
 
 MVP 1C now includes Python normalization helpers for file operation events and redacted terminal command events stored as raw events. This is not a live file watcher or terminal hook yet.
 
@@ -74,7 +74,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 
 ## Current Limitations
 
-- Only the active-window worker is wired into the Python sidecar. The Tauri event bridge requires a configured localhost sidecar URL; screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live.
+- Active-window and screenshot workers are wired into the Python sidecar. The Tauri event bridge requires a configured localhost sidecar URL; file watcher, terminal capture, OCR, and model runtimes are still not live.
 - The desktop app is a shell and preview UI, not the finished recorder dashboard.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.

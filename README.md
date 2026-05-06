@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-only desktop shell, and a minimal FastAPI health app. It does not yet include desktop sidecar lifecycle, capture workers, end-to-end recording, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-only desktop shell, minimal FastAPI health app, and typed sidecar health commands. It does not yet include live capture workers, end-to-end recording, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -21,6 +21,8 @@ MVP 1A now includes a minimal Python 3.13 FastAPI app foundation with a tested `
 MVP 1A now includes typed desktop sidecar health commands and UI states for loading, missing, and unhealthy sidecar conditions.
 
 MVP 1B now includes a persisted Python session state machine for recording, paused, stopped, and interrupted statuses. This does not start capture workers yet.
+
+MVP 1B now includes deterministic fake active-window raw events, SQLite raw-event read/write helpers, and a raw timeline UI preview. This is not live OS capture yet.
 
 ## What It Is
 

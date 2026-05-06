@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
@@ -85,4 +85,22 @@ test("shows healthy sidecar version details", async () => {
   expect(await screen.findByText("Sidecar healthy")).toBeInTheDocument();
   expect(screen.getByText("Local agent sidecar is healthy.")).toBeInTheDocument();
   expect(screen.getByText("App 0.0.0 / schema 001_initial.sql")).toBeInTheDocument();
+});
+
+test("shows ordered raw active window timeline changes", async () => {
+  getSidecarHealthMock.mockResolvedValue(missingSidecar);
+
+  render(<App />);
+
+  const timeline = screen.getByRole("region", { name: "Raw timeline simulation" });
+  const items = within(timeline).getAllByRole("listitem");
+
+  expect(items).toHaveLength(5);
+  expect(items.map((item) => item.textContent)).toEqual([
+    expect.stringContaining("09:14VS Codeactive_windowworkaudit-ai - App.tsx"),
+    expect.stringContaining("09:16Chromeactive_windowIssue #9 - GitHub"),
+    expect.stringContaining("09:19Windows Terminalactive_windowuv run --python 3.13 pytest"),
+    expect.stringContaining("09:22VS Codeactive_windowraw_events_repository.py"),
+    expect.stringContaining("09:24File Exploreractive_windowworktrace session folder"),
+  ]);
 });

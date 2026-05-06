@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+import { RawTimeline } from "./features/timeline/RawTimeline";
+import { rawTimelineSimulationEvents } from "./features/timeline/raw-timeline-simulation";
 import { getSidecarHealth, startSidecar, stopSidecar, type SidecarHealth } from "./lib/tauri-client";
 
 const statusPanels = [
@@ -164,6 +166,8 @@ function App() {
             </article>
           ))}
         </section>
+
+        <RawTimeline events={rawTimelineSimulationEvents} />
       </section>
     </main>
   );

@@ -3,8 +3,18 @@ import "./App.css";
 import { RecoveryBanner } from "./features/recovery/RecoveryBanner";
 import { recoverySimulationSessions } from "./features/recovery/recovery-simulation";
 import { RawTimeline } from "./features/timeline/RawTimeline";
-import { rawTimelineSimulationEvents } from "./features/timeline/raw-timeline-simulation";
-import { getSidecarHealth, startSidecar, stopSidecar, type SidecarHealth } from "./lib/tauri-client";
+import {
+  rawTimelineSimulationEvents,
+  type RawTimelineEvent,
+} from "./features/timeline/raw-timeline-simulation";
+import {
+  getSessionEvents,
+  getSidecarHealth,
+  startSidecar,
+  stopSidecar,
+  type SessionEventsResult,
+  type SidecarHealth,
+} from "./lib/tauri-client";
 
 const statusPanels = [
   {
@@ -34,6 +44,11 @@ const initialSidecarHealth: SidecarHealth = {
   message: "Checking local agent sidecar status.",
 };
 
+const initialSessionEvents: SessionEventsResult = {
+  status: "unavailable",
+  events: [],
+};
+
 const sidecarLabels: Record<SidecarHealth["status"], string> = {
   loading: "Checking sidecar",
   healthy: "Sidecar healthy",
@@ -50,6 +65,11 @@ const sidecarTone: Record<SidecarHealth["status"], string> = {
 
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
+  const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
+  const timelineEvents: RawTimelineEvent[] =
+    sessionEvents.status === "available" && sessionEvents.events.length > 0
+      ? sessionEvents.events
+      : rawTimelineSimulationEvents;
 
   const refreshSidecarHealth = useCallback(async () => {
     setSidecarHealth(initialSidecarHealth);
@@ -75,9 +95,10 @@ function App() {
   useEffect(() => {
     let isMounted = true;
 
-    void getSidecarHealth().then((health) => {
+    void Promise.all([getSidecarHealth(), getSessionEvents()]).then(([health, events]) => {
       if (isMounted) {
         setSidecarHealth(health);
+        setSessionEvents(events);
       }
     });
 
@@ -171,7 +192,7 @@ function App() {
 
         <RecoveryBanner sessions={recoverySimulationSessions} />
 
-        <RawTimeline events={rawTimelineSimulationEvents} />
+        <RawTimeline events={timelineEvents} sourceStatus={sessionEvents.status} />
       </section>
     </main>
   );

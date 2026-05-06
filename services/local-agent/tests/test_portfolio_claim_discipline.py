@@ -21,6 +21,11 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "## Two-Minute Review" in readme
     assert "## Evidence and Verification" in readme
     assert "## Current Limitations" in readme
+    assert "real Windows active-window polling" in readme
+    assert (
+        "screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live"
+        in readme
+    )
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme
 

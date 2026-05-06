@@ -2,28 +2,31 @@ import type { RawTimelineEvent } from "./raw-timeline-simulation";
 
 type RawTimelineProps = {
   events: RawTimelineEvent[];
+  sourceStatus: "available" | "unavailable";
 };
 
-export function RawTimeline({ events }: RawTimelineProps) {
+export function RawTimeline({ events, sourceStatus }: RawTimelineProps) {
   const orderedEvents = [...events].sort((first, second) =>
     first.timestamp.localeCompare(second.timestamp),
   );
+  const isLive = sourceStatus === "available";
 
   return (
     <section
-      aria-label="Raw timeline simulation"
+      aria-label="Raw timeline"
       className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
     >
       <div className="flex flex-col gap-2 border-b border-zinc-200 pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
-            Simulation preview
+            {isLive ? "Live sidecar events" : "Fixture fallback"}
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-normal">Raw timeline</h2>
         </div>
         <p className="max-w-2xl text-sm leading-6 text-zinc-700">
-          Deterministic active-window events for the 10-minute fake recording test. Live OS capture
-          is not wired yet.
+          {isLive
+            ? "Active-window changes loaded from the local sidecar event stream."
+            : "The local sidecar event stream is unavailable, so this preview is using deterministic fixture events."}
         </p>
       </div>
 

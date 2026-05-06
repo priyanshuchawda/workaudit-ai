@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-only desktop shell, minimal FastAPI health app, and typed sidecar health commands. It does not yet include live capture workers, end-to-end recording, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-oriented desktop shell, minimal FastAPI app, typed sidecar health commands, and a first real Windows active-window polling loop in the Python sidecar. It does not yet include screenshot capture, file watcher capture, terminal capture, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -23,6 +23,8 @@ MVP 1A now includes typed desktop sidecar health commands and UI states for load
 MVP 1B now includes a persisted Python session state machine for recording, paused, stopped, and interrupted statuses. This does not start capture workers yet.
 
 MVP 1B now includes deterministic fake active-window raw events, SQLite raw-event read/write helpers, and a raw timeline UI preview. This is not live OS capture yet.
+
+MVP 1B now includes real Windows active-window polling in the Python sidecar, with a provider abstraction, change-only raw-event persistence, session start/stop API wiring, and safe provider failure handling. This records app/process/window-title changes only; screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live.
 
 MVP 1C now includes a Python screenshot sampler policy with duplicate skipping, 5-second interval defaults, 1280px width metadata, hourly storage caps, and SQLite screenshot metadata. This is not live OS screenshot capture yet.
 
@@ -58,7 +60,7 @@ MVP 4 now includes deterministic recording resource budget checks and a fake 30-
 
 WorkTrace AI is a local-first desktop recorder and evidence timeline project. The implemented repo currently proves the foundations: typed contracts, SQLite WAL migrations, fake session storage/export, a Tauri shell, sidecar health, deterministic timeline/export/report foundations, model fallback states, selective AI-worker contracts, workflow debugging rules, golden evals, and deterministic resource budget checks.
 
-The project is still a foundation/demo repo. It is not a live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
+The project is still a foundation/demo repo. It now has real Windows active-window polling, but it is not a full live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
 
 ## Evidence and Verification
 
@@ -70,7 +72,7 @@ The project is still a foundation/demo repo. It is not a live Windows recorder y
 
 ## Current Limitations
 
-- Live Windows capture workers are not wired into an end-to-end recorder.
+- Only the active-window worker is wired into the Python sidecar. Screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live.
 - The desktop app is a shell and preview UI, not the finished recorder dashboard.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.

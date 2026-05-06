@@ -46,6 +46,8 @@ MVP 2A now includes a selective OCR worker foundation that processes changed hig
 
 MVP 2A now includes optional audio transcription and command embedding foundations with fakeable engine/model contracts. Audio transcription is disabled by default, command clusters keep evidence event IDs, and no real audio capture, model download, or embedding runtime is implemented yet.
 
+MVP 2B now includes a selected-frame vision analysis foundation with secret-risk refusal, cancellation, and fakeable VLM analyzer contracts. This does not implement continuous vision, real VLM integration, model downloads, or UI deep analysis yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

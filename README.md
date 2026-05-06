@@ -26,6 +26,8 @@ MVP 1B now includes deterministic fake active-window raw events, SQLite raw-even
 
 MVP 1C now includes a Python screenshot sampler policy with duplicate skipping, 5-second interval defaults, 1280px width metadata, hourly storage caps, and SQLite screenshot metadata. This is not live OS screenshot capture yet.
 
+MVP 1C now includes Python normalization helpers for file operation events and redacted terminal command events stored as raw events. This is not a live file watcher or terminal hook yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

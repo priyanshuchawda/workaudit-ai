@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
@@ -212,6 +212,78 @@ test("shows real sidecar terminal command events when available", async () => {
   expect(items[0].textContent).toContain(
     "09:16Terminal commandterminal_command_detectorpowershell exit 1: pnpm test --token [REDACTED]",
   );
+});
+
+test("renders session dashboard surfaces with honest unavailable actions", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+
+  render(<App />);
+
+  expect(await screen.findByRole("region", { name: "Sessions" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Session detail" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Screenshot evidence" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Export and retention" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Privacy status" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Delete screenshots" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Export Markdown" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Export raw JSON" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete session" })).toBeDisabled();
+  expect(screen.getByText("Screenshot metadata bridge unavailable")).toBeInTheDocument();
+});
+
+test("filters live raw timeline events by source", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+      {
+        id: "evt_file_001",
+        timestamp: "2026-05-06T09:15:00+05:30",
+        app: "File change",
+        windowTitle: "modified C:/repo/src/app.py",
+        source: "file_watcher",
+        type: "file_changed",
+      },
+      {
+        id: "evt_terminal_001",
+        timestamp: "2026-05-06T09:16:00+05:30",
+        app: "Terminal command",
+        windowTitle: "powershell exit 1: pnpm test",
+        source: "terminal_command_detector",
+        type: "terminal_command",
+      },
+    ],
+  });
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+  fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
+
+  const items = within(timeline).getAllByRole("listitem");
+  expect(items).toHaveLength(1);
+  expect(items[0].textContent).toContain("Terminal command");
+  expect(within(timeline).queryByText("VS Code")).not.toBeInTheDocument();
+  expect(within(timeline).queryByText("File change")).not.toBeInTheDocument();
+});
+
+test("shows empty raw timeline state when live sidecar has no events", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({ status: "available", events: [] });
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+
+  expect(within(timeline).getByText("No raw events for this filter.")).toBeInTheDocument();
 });
 
 test("shows safe missing-sidecar timeline state before falling back to fixtures", async () => {

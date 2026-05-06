@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-oriented desktop shell, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, a first real Windows active-window polling loop, real Windows screenshot capture with artifact storage, metadata-only file watcher capture for configured folders, and explicit safe terminal command ingestion in the Python sidecar. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, a first real Windows active-window polling loop, real Windows screenshot capture with artifact storage, metadata-only file watcher capture for configured folders, and explicit safe terminal command ingestion in the Python sidecar. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -19,6 +19,8 @@ MVP 1A now includes an initial Tauri v2 React desktop shell with status-only Hom
 MVP 1A now includes a minimal Python 3.13 FastAPI app foundation with a tested `/health` endpoint for sidecar status.
 
 MVP 1A now includes typed desktop sidecar health commands and UI states for loading, missing, and unhealthy sidecar conditions.
+
+MVP 1A now includes a desktop session dashboard foundation with a sessions panel, session detail surface, source-filtered raw timeline, screenshot evidence unavailable state, disabled export/retention actions for commands that are not wired yet, and a privacy status panel.
 
 MVP 1B now includes a persisted Python session state machine for recording, paused, stopped, and interrupted statuses. This does not start capture workers yet.
 
@@ -78,7 +80,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 
 - Active-window, screenshot, configured-folder file watcher, and explicit terminal command ingestion paths are wired into the Python sidecar. The Tauri event bridge requires a configured localhost sidecar URL; OCR and model runtimes are still not live.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
-- The desktop app is a shell and preview UI, not the finished recorder dashboard.
+- The desktop app now has a session dashboard foundation, but start/pause/resume recorder control flow, desktop export commands, and desktop screenshot metadata commands are not fully wired yet.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.

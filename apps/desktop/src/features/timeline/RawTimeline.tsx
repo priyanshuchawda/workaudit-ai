@@ -30,20 +30,26 @@ export function RawTimeline({ events, sourceStatus }: RawTimelineProps) {
         </p>
       </div>
 
-      <ol className="mt-4 divide-y divide-zinc-200">
-        {orderedEvents.map((event) => (
-          <li className="grid gap-3 py-4 md:grid-cols-[5rem_14rem_1fr]" key={event.id}>
-            <time className="text-sm font-semibold text-zinc-700" dateTime={event.timestamp}>
-              {formatTimelineTime(event.timestamp)}
-            </time>
-            <div>
-              <p className="font-semibold text-zinc-950">{event.app}</p>
-              <p className="text-xs uppercase tracking-wide text-zinc-500">{event.source}</p>
-            </div>
-            <p className="text-sm leading-6 text-zinc-800">{event.windowTitle}</p>
-          </li>
-        ))}
-      </ol>
+      {orderedEvents.length === 0 ? (
+        <p className="mt-4 rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-4 text-sm text-zinc-700">
+          No raw events for this filter.
+        </p>
+      ) : (
+        <ol className="mt-4 divide-y divide-zinc-200">
+          {orderedEvents.map((event) => (
+            <li className="grid gap-3 py-4 md:grid-cols-[5rem_14rem_1fr]" key={event.id}>
+              <time className="text-sm font-semibold text-zinc-700" dateTime={event.timestamp}>
+                {formatTimelineTime(event.timestamp)}
+              </time>
+              <div>
+                <p className="font-semibold text-zinc-950">{event.app}</p>
+                <p className="text-xs uppercase tracking-wide text-zinc-500">{event.source}</p>
+              </div>
+              <p className="text-sm leading-6 text-zinc-800">{event.windowTitle}</p>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

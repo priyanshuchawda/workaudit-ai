@@ -171,11 +171,36 @@ impl From<SidecarRawEvent> for SessionTimelineEvent {
 fn is_timeline_event(event: &SidecarRawEvent) -> bool {
     matches!(
         (event.source.as_str(), event.event_type.as_str()),
-        ("active_window", "active_window_changed") | ("file_watcher", "file_changed")
+        ("active_window", "active_window_changed")
+            | ("file_watcher", "file_changed")
+            | ("terminal_command_detector", "terminal_command")
     )
 }
 
 fn timeline_display_text(event: &SidecarRawEvent) -> (String, String) {
+    if event.source == "terminal_command_detector" && event.event_type == "terminal_command" {
+        let command = event
+            .metadata
+            .get("command")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown command");
+        let shell = event
+            .metadata
+            .get("shell")
+            .and_then(Value::as_str)
+            .unwrap_or("terminal");
+        let exit_code = event
+            .metadata
+            .get("exit_code")
+            .and_then(Value::as_i64)
+            .map(|code| format!(" exit {code}"))
+            .unwrap_or_default();
+        return (
+            "Terminal command".to_string(),
+            redact_text(&format!("{shell}{exit_code}: {command}")),
+        );
+    }
+
     if event.source == "file_watcher" && event.event_type == "file_changed" {
         let operation = event
             .metadata

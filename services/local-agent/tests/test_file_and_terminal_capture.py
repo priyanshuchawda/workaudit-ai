@@ -4,7 +4,10 @@ from pathlib import Path
 import pytest
 
 from worktrace_agent.capture.file_watcher import normalize_file_event
-from worktrace_agent.capture.terminal_command_detector import normalize_terminal_command
+from worktrace_agent.capture.terminal_command_detector import (
+    hash_command,
+    normalize_terminal_command,
+)
 from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.raw_events_repository import append_raw_event, list_raw_events
 from worktrace_agent.db.session_state_repository import start_session
@@ -78,6 +81,8 @@ def test_terminal_command_is_redacted_before_storage_and_export(tmp_path: Path) 
     redacted_command = event.metadata["command"]
     assert isinstance(redacted_command, str)
     assert redacted_command.count(REDACTION_TOKEN) >= 3
+    assert event.metadata["command_hash"] == hash_command(redacted_command)
+    assert event.metadata["command_hash"] != hash_command(raw_command)
 
     serialized_metadata = json.dumps(event.metadata)
     for secret in PRIVACY_TEST_CORPUS + SECRET_VALUES:

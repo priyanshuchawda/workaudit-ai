@@ -186,6 +186,34 @@ test("shows real sidecar file watcher events when available", async () => {
   ]);
 });
 
+test("shows real sidecar terminal command events when available", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  const sidecarEvents: SessionEventsResult = {
+    status: "available",
+    events: [
+      {
+        id: "evt_terminal_001",
+        timestamp: "2026-05-06T09:16:00+05:30",
+        app: "Terminal command",
+        windowTitle: "powershell exit 1: pnpm test --token [REDACTED]",
+        source: "terminal_command_detector",
+        type: "terminal_command",
+      },
+    ],
+  };
+  getSessionEventsMock.mockResolvedValue(sidecarEvents);
+
+  render(<App />);
+
+  const timeline = await screen.findByRole("region", { name: "Raw timeline" });
+  const items = within(timeline).getAllByRole("listitem");
+
+  expect(items).toHaveLength(1);
+  expect(items[0].textContent).toContain(
+    "09:16Terminal commandterminal_command_detectorpowershell exit 1: pnpm test --token [REDACTED]",
+  );
+});
+
 test("shows safe missing-sidecar timeline state before falling back to fixtures", async () => {
   getSidecarHealthMock.mockResolvedValue(missingSidecar);
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });

@@ -26,12 +26,13 @@ def normalize_terminal_command(
     exit_code: int | None = None,
 ) -> RawEvent:
     redacted_command, was_redacted = redact_terminal_command(command)
+    command_hash = hash_command(redacted_command)
 
     return build_raw_event(
         event_id=build_terminal_event_id(
             session_id=session_id,
             timestamp=timestamp,
-            command_hash=hash_command(command),
+            command_hash=command_hash,
         ),
         session_id=session_id,
         timestamp=timestamp,
@@ -44,7 +45,7 @@ def normalize_terminal_command(
             "shell": require_non_empty(shell, "shell"),
             "exit_code": exit_code,
             "redacted": was_redacted,
-            "command_hash": hash_command(command),
+            "command_hash": command_hash,
         },
     )
 

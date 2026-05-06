@@ -121,6 +121,63 @@ def test_session_start_stops_file_watcher_when_roots_are_configured(tmp_path: Pa
     assert file_events[0]["metadata"]["path"].endswith("src/app.py")
 
 
+def test_ingest_terminal_command_persists_redacted_event(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            recorder_poll_interval_seconds=0.01,
+        )
+    )
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_terminal_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+        },
+    )
+
+    response = client.post(
+        "/sessions/sess_api_terminal_001/terminal-events",
+        json={
+            "timestamp": "2026-05-06T09:14:30+05:30",
+            "command": "pnpm test --token ghp_test",
+            "shell": "powershell",
+            "exit_code": 1,
+        },
+    )
+    events_response = client.get("/sessions/sess_api_terminal_001/events")
+
+    assert response.status_code == 200
+    terminal_event = response.json()
+    assert terminal_event["source"] == "terminal_command_detector"
+    assert terminal_event["type"] == "terminal_command"
+    assert terminal_event["privacy_level"] == "redacted"
+    assert terminal_event["metadata"]["command"] == "pnpm test --token [REDACTED]"
+    assert terminal_event["metadata"]["exit_code"] == 1
+    assert terminal_event["metadata"]["shell"] == "powershell"
+    assert "ghp_test" not in str(terminal_event)
+    listed_events = events_response.json()["events"]
+    assert any(event["id"] == terminal_event["id"] for event in listed_events)
+
+
+def test_ingest_terminal_command_for_unknown_session_returns_safe_error(tmp_path: Path) -> None:
+    client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
+
+    response = client.post(
+        "/sessions/sess_missing/terminal-events",
+        json={
+            "timestamp": "2026-05-06T09:14:30+05:30",
+            "command": "pnpm test",
+            "shell": "powershell",
+            "exit_code": 0,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Unknown session: sess_missing"}
+
+
 def test_start_stop_list_and_delete_session_screenshots(tmp_path: Path) -> None:
     client = TestClient(
         create_app(

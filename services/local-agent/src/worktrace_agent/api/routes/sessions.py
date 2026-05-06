@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from worktrace_agent.api.session_recorder_service import (
     SessionRecorderService,
+    is_sqlite_missing_session_error,
     map_session_error,
 )
 from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
@@ -28,6 +30,13 @@ class StartSessionRequest(BaseModel):
 
 class StopSessionRequest(BaseModel):
     stopped_at: str = Field(min_length=1)
+
+
+class TerminalCommandEventRequest(BaseModel):
+    timestamp: str = Field(min_length=1)
+    command: str = Field(min_length=1)
+    shell: str = Field(default="powershell", min_length=1)
+    exit_code: int | None = None
 
 
 class SessionResponse(BaseModel):
@@ -128,6 +137,28 @@ async def list_recording_session_events(session_id: str, request: Request) -> Se
             for event in service.list_session_events(session_id=session_id)
         ]
     )
+
+
+@router.post("/{session_id}/terminal-events", response_model=RawEventResponse)
+async def ingest_terminal_command_event(
+    session_id: str,
+    request_body: TerminalCommandEventRequest,
+    request: Request,
+) -> RawEventResponse:
+    service = _session_service(request)
+    try:
+        event = service.ingest_terminal_command(
+            session_id=session_id,
+            timestamp=request_body.timestamp,
+            command=request_body.command,
+            shell=request_body.shell,
+            exit_code=request_body.exit_code,
+        )
+    except sqlite3.Error as error:
+        if is_sqlite_missing_session_error(error):
+            raise HTTPException(status_code=409, detail=f"Unknown session: {session_id}") from error
+        raise HTTPException(status_code=500, detail="Could not ingest terminal event.") from error
+    return _raw_event_response(event)
 
 
 @router.get("/{session_id}/screenshots", response_model=SessionScreenshotsResponse)

@@ -21,8 +21,9 @@ from worktrace_agent.capture.screenshot_capture import (
     WindowsScreenshotProvider,
 )
 from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
+from worktrace_agent.capture.terminal_command_detector import normalize_terminal_command
 from worktrace_agent.db.connection import initialize_database
-from worktrace_agent.db.raw_events_repository import list_raw_events
+from worktrace_agent.db.raw_events_repository import append_raw_event, list_raw_events
 from worktrace_agent.db.screenshots_repository import (
     ScreenshotDeletionResult,
     delete_screenshots_for_session,
@@ -163,6 +164,25 @@ class SessionRecorderService:
         if resolved_session_id is None:
             return []
         return list_raw_events(self._connection, resolved_session_id)
+
+    def ingest_terminal_command(
+        self,
+        *,
+        session_id: str,
+        timestamp: str,
+        command: str,
+        shell: str,
+        exit_code: int | None,
+    ) -> RawEvent:
+        event = normalize_terminal_command(
+            session_id=session_id,
+            timestamp=timestamp,
+            command=command,
+            shell=shell,
+            exit_code=exit_code,
+        )
+        append_raw_event(self._connection, event)
+        return event
 
     def list_session_screenshots(self, *, session_id: str) -> list[ScreenshotArtifact]:
         resolved_session_id = self._resolve_session_id(session_id)

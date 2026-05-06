@@ -11,8 +11,19 @@ from worktrace_agent.capture.active_window import (
     ActiveWindowRecorder,
     WindowsActiveWindowProvider,
 )
+from worktrace_agent.capture.screenshot_capture import (
+    ScreenshotCaptureWorker,
+    ScreenshotProvider,
+    WindowsScreenshotProvider,
+)
+from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
 from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.raw_events_repository import list_raw_events
+from worktrace_agent.db.screenshots_repository import (
+    ScreenshotDeletionResult,
+    delete_screenshots_for_session,
+    list_screenshots,
+)
 from worktrace_agent.db.session_state_repository import (
     SessionTransitionError,
     start_session,
@@ -34,12 +45,18 @@ class SessionRecorderService:
         *,
         db_path: Path,
         active_window_provider: ActiveWindowProvider | None = None,
+        screenshot_provider: ScreenshotProvider | None = None,
         recorder_poll_interval_seconds: float = 1,
+        screenshot_interval_seconds: float = 5,
     ) -> None:
+        self._db_path = Path(db_path)
         self._connection = initialize_database(db_path)
         self._active_window_provider = active_window_provider or WindowsActiveWindowProvider()
+        self._screenshot_provider = screenshot_provider or WindowsScreenshotProvider()
         self._recorder_poll_interval_seconds = recorder_poll_interval_seconds
+        self._screenshot_interval_seconds = screenshot_interval_seconds
         self._running_recorders: dict[str, RunningRecorder] = {}
+        self._running_screenshot_workers: dict[str, RunningScreenshotWorker] = {}
         self._lock = asyncio.Lock()
 
     async def start_recording_session(
@@ -72,10 +89,34 @@ class SessionRecorderService:
                     recorder=recorder,
                     task=asyncio.create_task(recorder.run()),
                 )
+            if session_id not in self._running_screenshot_workers:
+                screenshot_worker = ScreenshotCaptureWorker(
+                    connection=self._connection,
+                    session_id=session_id,
+                    artifact_root=self._artifact_root_for_session(session),
+                    provider=self._screenshot_provider,
+                    interval_seconds=self._screenshot_interval_seconds,
+                )
+                active_process_name = self._active_process_name()
+                screenshot_worker.poll_once(active_process_name=active_process_name)
+                self._running_screenshot_workers[session_id] = RunningScreenshotWorker(
+                    worker=screenshot_worker,
+                    task=asyncio.create_task(
+                        screenshot_worker.run(
+                            active_process_name_provider=self._active_process_name,
+                        )
+                    ),
+                )
             return session
 
     async def stop_recording_session(self, *, session_id: str, stopped_at: str) -> SessionRecord:
         async with self._lock:
+            running_screenshots = self._running_screenshot_workers.pop(session_id, None)
+            if running_screenshots is not None:
+                await running_screenshots.worker.stop()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await running_screenshots.task
+
             running = self._running_recorders.pop(session_id, None)
             if running is not None:
                 await running.recorder.stop()
@@ -92,6 +133,19 @@ class SessionRecorderService:
         if resolved_session_id is None:
             return []
         return list_raw_events(self._connection, resolved_session_id)
+
+    def list_session_screenshots(self, *, session_id: str) -> list[ScreenshotArtifact]:
+        resolved_session_id = self._resolve_session_id(session_id)
+        if resolved_session_id is None:
+            return []
+        return list_screenshots(self._connection, resolved_session_id)
+
+    def delete_session_screenshots(self, *, session_id: str) -> ScreenshotDeletionResult:
+        return delete_screenshots_for_session(
+            self._connection,
+            session_id=session_id,
+            artifact_root=self._artifact_root_for_session_id(session_id),
+        )
 
     def close(self) -> None:
         self._connection.close()
@@ -111,6 +165,32 @@ class SessionRecorderService:
         if row is None:
             return None
         return str(row["id"])
+
+    def _active_process_name(self) -> str | None:
+        try:
+            snapshot = self._active_window_provider.get_active_window()
+        except Exception:
+            return None
+        if snapshot is None:
+            return None
+        return snapshot.process_name
+
+    def _artifact_root_for_session(self, session: SessionRecord) -> Path:
+        if session.storage_path:
+            return Path(session.storage_path)
+        return self._artifact_root_for_session_id(session.id)
+
+    def _artifact_root_for_session_id(self, session_id: str) -> Path:
+        base = self._db_path.parent
+        if base.name == "db":
+            base = base.parent
+        return base / "sessions" / session_id
+
+
+@dataclass
+class RunningScreenshotWorker:
+    worker: ScreenshotCaptureWorker
+    task: asyncio.Task[None]
 
 
 def map_session_error(error: SessionTransitionError) -> tuple[int, str]:

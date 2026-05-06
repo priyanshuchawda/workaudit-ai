@@ -48,6 +48,8 @@ MVP 2A now includes optional audio transcription and command embedding foundatio
 
 MVP 2B now includes a selected-frame vision analysis foundation with secret-risk refusal, cancellation, and fakeable VLM analyzer contracts. This does not implement continuous vision, real VLM integration, model downloads, or UI deep analysis yet.
 
+MVP 3 now includes a deterministic workflow debugger foundation that derives evidence-cited recipe steps and workflow findings from local timeline events. This does not implement autonomous replay, command execution, UI recipe review, or the formal golden eval runner yet.
+
 ## What It Is
 
 WorkTrace AI is planned as a local-first Windows desktop activity recorder and timeline engine. The product direction is to capture local session evidence, build a deterministic timeline, and then use AI only where it can cite the session evidence it used.

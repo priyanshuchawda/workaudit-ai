@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, and the first SQLite migration foundation. It does not yet include the desktop app, local sidecar runtime, capture workers, end-to-end session storage, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a status-only desktop shell, and a minimal FastAPI health app. It does not yet include desktop sidecar lifecycle, capture workers, end-to-end recording, AI report generation, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -15,6 +15,8 @@ MVP 0 now also includes a Python 3.13 SQLite migration foundation with WAL mode 
 MVP 0 now includes a fake-session validation, SQLite round-trip, and redacted raw JSON export proof.
 
 MVP 1A now includes an initial Tauri v2 React desktop shell with status-only Home panels.
+
+MVP 1A now includes a minimal Python 3.13 FastAPI app foundation with a tested `/health` endpoint for sidecar status.
 
 ## What It Is
 
@@ -92,7 +94,7 @@ Contributors and AI coding agents must read these before making changes:
 - `docs/react_typescript.md`
 - `docs/python_LLM.md`
 
-The current phase is Phase 0. Do not add Tauri, React, Rust, Python, FastAPI, SQLite, capture, OCR, model, or AI runtime code until the relevant issue explicitly asks for it.
+Do not add Tauri, React, Rust, Python, FastAPI, SQLite, capture, OCR, model, or AI runtime code unless the relevant issue explicitly asks for it.
 
 ## Roadmap
 

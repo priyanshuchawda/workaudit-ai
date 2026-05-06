@@ -14,6 +14,13 @@ def get_applied_migrations(connection: sqlite3.Connection) -> list[str]:
     return [str(row["filename"]) for row in rows]
 
 
+def get_latest_schema_version(migrations_dir: Path | None = None) -> str:
+    migration_files = _migration_files(migrations_dir or DEFAULT_MIGRATIONS_DIR)
+    if not migration_files:
+        return "none"
+    return migration_files[-1].name
+
+
 def apply_migrations(
     connection: sqlite3.Connection,
     migrations_dir: Path | None = None,

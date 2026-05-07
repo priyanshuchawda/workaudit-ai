@@ -40,7 +40,7 @@ Implemented today:
 - SQLite WAL migrations and repositories
 - fake session validation and export
 - real Windows active-window polling
-- real Windows screenshot capture and artifact metadata
+- real Windows screenshot capture, compressed PNG artifacts, retention cleanup, and artifact metadata
 - metadata-only configured-folder file watching
 - explicit safe terminal command ingestion
 - privacy redaction and private-mode suppression across implemented capture workers
@@ -51,8 +51,8 @@ Implemented today:
 
 Not implemented yet:
 
-- bundled Python sidecar installer artifact
-- desktop export/screenshot-management commands
+- installer install/run QA
+- JPEG/WebP screenshot encoding
 - desktop privacy center and configurable blocklist UI
 - production signing or updater
 - real model runtime downloads

@@ -4,7 +4,10 @@ import asyncio
 import ctypes
 import os
 import sqlite3
+import struct
+import zlib
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -15,7 +18,12 @@ from worktrace_agent.capture.screenshot_sampler import (
     ScreenshotSampler,
 )
 from worktrace_agent.db.raw_events_repository import list_raw_events
-from worktrace_agent.db.screenshots_repository import save_screenshot
+from worktrace_agent.db.screenshots_repository import (
+    DEFAULT_SCREENSHOT_RETENTION_CONFIG,
+    ScreenshotRetentionConfig,
+    prune_screenshots_for_session,
+    save_screenshot,
+)
 from worktrace_agent.privacy.policy import PrivacyPolicy
 
 SCREENSHOT_SOURCE = "screenshot_sampler"
@@ -75,6 +83,7 @@ class ScreenshotCaptureWorker:
         provider: ScreenshotProvider,
         sampler: ScreenshotSampler | None = None,
         privacy_policy: PrivacyPolicy | None = None,
+        retention_config: ScreenshotRetentionConfig | None = None,
         interval_seconds: float = 5,
     ) -> None:
         self._connection = connection
@@ -83,6 +92,7 @@ class ScreenshotCaptureWorker:
         self._provider = provider
         self._sampler = sampler or ScreenshotSampler()
         self._privacy_policy = privacy_policy or PrivacyPolicy()
+        self._retention_config = retention_config or DEFAULT_SCREENSHOT_RETENTION_CONFIG
         self._interval_seconds = interval_seconds
         self._stop_event = asyncio.Event()
         self.poll_count = 0
@@ -118,10 +128,36 @@ class ScreenshotCaptureWorker:
         if decision.accepted is None:
             return None
 
-        self._write_artifact(frame=frame, artifact=decision.accepted)
-        save_screenshot(self._connection, decision.accepted)
+        stored_rgb = downscale_rgb_nearest(
+            rgb_bytes=frame.rgb_bytes,
+            width=frame.width,
+            height=frame.height,
+            stored_width=decision.accepted.stored_width,
+            stored_height=decision.accepted.stored_height,
+        )
+        artifact_bytes = encode_png_rgb(
+            rgb_bytes=stored_rgb,
+            width=decision.accepted.stored_width,
+            height=decision.accepted.stored_height,
+        )
+        artifact = replace(decision.accepted, byte_size=len(artifact_bytes))
+        try:
+            self._write_artifact_bytes(artifact=artifact, artifact_bytes=artifact_bytes)
+            save_screenshot(self._connection, artifact)
+            prune_screenshots_for_session(
+                self._connection,
+                session_id=self._session_id,
+                artifact_root=self._artifact_root,
+                config=self._retention_config,
+            )
+        except OSError:
+            self.last_error = "screenshot_storage_error"
+            return None
+        except ValueError:
+            self.last_error = "screenshot_storage_error"
+            return None
         self.last_error = None
-        return decision.accepted
+        return artifact
 
     async def run(
         self,
@@ -161,7 +197,12 @@ class ScreenshotCaptureWorker:
         )
         return nearest.id
 
-    def _write_artifact(self, *, frame: ScreenshotFrame, artifact: ScreenshotArtifact) -> None:
+    def _write_artifact_bytes(
+        self,
+        *,
+        artifact: ScreenshotArtifact,
+        artifact_bytes: bytes,
+    ) -> None:
         resolved_root = self._artifact_root.resolve()
         target = (resolved_root / artifact.storage_path).resolve()
         try:
@@ -170,15 +211,8 @@ class ScreenshotCaptureWorker:
             raise ValueError("screenshot artifact path is outside artifact root") from error
 
         target.parent.mkdir(parents=True, exist_ok=True)
-        stored_rgb = downscale_rgb_nearest(
-            rgb_bytes=frame.rgb_bytes,
-            width=frame.width,
-            height=frame.height,
-            stored_width=artifact.stored_width,
-            stored_height=artifact.stored_height,
-        )
         temporary_path = target.with_suffix(f"{target.suffix}.tmp")
-        temporary_path.write_bytes(stored_rgb)
+        temporary_path.write_bytes(artifact_bytes)
         temporary_path.replace(target)
 
 
@@ -202,6 +236,41 @@ def downscale_rgb_nearest(
             target_index = (stored_y * stored_width + stored_x) * 3
             output[target_index : target_index + 3] = rgb_bytes[source_index : source_index + 3]
     return bytes(output)
+
+
+def encode_png_rgb(*, rgb_bytes: bytes, width: int, height: int) -> bytes:
+    if width <= 0 or height <= 0:
+        raise ValueError("png dimensions must be positive")
+    expected_bytes = width * height * 3
+    if len(rgb_bytes) != expected_bytes:
+        raise ValueError("rgb_bytes must contain exactly width * height * 3 bytes")
+
+    rows = bytearray()
+    row_stride = width * 3
+    for y in range(height):
+        row_start = y * row_stride
+        rows.append(0)
+        rows.extend(rgb_bytes[row_start : row_start + row_stride])
+
+    return b"".join(
+        (
+            b"\x89PNG\r\n\x1a\n",
+            _png_chunk(
+                b"IHDR",
+                struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0),
+            ),
+            _png_chunk(b"IDAT", zlib.compress(bytes(rows), level=6)),
+            _png_chunk(b"IEND", b""),
+        )
+    )
+
+
+def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(chunk_type)
+    checksum = zlib.crc32(data, checksum)
+    return (
+        struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", checksum & 0xFFFFFFFF)
+    )
 
 
 class BitmapInfoHeader(ctypes.Structure):

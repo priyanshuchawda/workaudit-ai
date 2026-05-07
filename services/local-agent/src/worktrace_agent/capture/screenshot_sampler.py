@@ -20,6 +20,18 @@ class ScreenshotSkipReason(StrEnum):
     STORAGE_CAP = "storage_cap"
 
 
+class ScreenshotArtifactFormat(StrEnum):
+    PNG = "png"
+
+
+@dataclass(frozen=True)
+class ScreenshotArtifactFormatDecision:
+    format: ScreenshotArtifactFormat
+    file_extension: str
+    media_type: str
+    reason: str
+
+
 @dataclass(frozen=True)
 class ScreenshotSamplerConfig:
     interval_seconds: int = DEFAULT_INTERVAL_SECONDS
@@ -128,6 +140,10 @@ class ScreenshotSampler:
             height=frame.height,
             max_width=self.config.max_width,
         )
+        format_decision = choose_screenshot_artifact_format(
+            width=stored_width,
+            height=stored_height,
+        )
         screenshot_index = self._accepted_counts.get(frame.session_id, 0)
         screenshot_id = f"{frame.session_id}-screenshot-{screenshot_index:03d}"
         return ScreenshotArtifact(
@@ -142,8 +158,21 @@ class ScreenshotSampler:
             byte_size=byte_size,
             content_hash=hashlib.sha256(frame.rgb_bytes).hexdigest(),
             visual_hash=visual_hash,
-            storage_path=f"screenshots/{screenshot_id}.rgb",
+            storage_path=f"screenshots/{screenshot_id}{format_decision.file_extension}",
         )
+
+
+def choose_screenshot_artifact_format(
+    *, width: int, height: int
+) -> ScreenshotArtifactFormatDecision:
+    if width <= 0 or height <= 0:
+        raise ValueError("screenshot dimensions must be positive")
+    return ScreenshotArtifactFormatDecision(
+        format=ScreenshotArtifactFormat.PNG,
+        file_extension=".png",
+        media_type="image/png",
+        reason="lossless_png_currently_supported_jpeg_webp_deferred",
+    )
 
 
 def validate_frame(frame: ScreenshotFrame) -> None:

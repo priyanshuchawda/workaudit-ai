@@ -92,7 +92,10 @@ def test_capture_worker_writes_downscaled_artifact_and_metadata(tmp_path: Path) 
         assert artifact.stored_height == 720
         written = artifact_root / artifact.storage_path
         assert written.exists()
-        assert written.stat().st_size == 1280 * 720 * 3
+        assert written.suffix == ".png"
+        assert written.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+        assert artifact.byte_size == written.stat().st_size
+        assert artifact.byte_size < 1280 * 720 * 3
     finally:
         connection.close()
 
@@ -121,7 +124,29 @@ def test_capture_worker_skips_duplicate_frame_without_writing(tmp_path: Path) ->
         assert first is not None
         assert second is None
         assert len(list_screenshots(connection, SESSION_ID)) == 1
-        assert len(list((artifact_root / "screenshots").glob("*.rgb"))) == 1
+        assert len(list((artifact_root / "screenshots").glob("*.png"))) == 1
+    finally:
+        connection.close()
+
+
+def test_capture_worker_degrades_safely_when_artifact_write_fails(tmp_path: Path) -> None:
+    connection = initialize_database(tmp_path / "worktrace.sqlite")
+    artifact_root = tmp_path / "session-artifacts"
+    artifact_root.write_text("not a directory", encoding="utf-8")
+    try:
+        start_session(connection, session_id=SESSION_ID, started_at=STARTED_AT)
+        worker = ScreenshotCaptureWorker(
+            connection=connection,
+            session_id=SESSION_ID,
+            artifact_root=artifact_root,
+            provider=StaticScreenshotProvider([frame(width=8, height=8, value=40)]),
+        )
+
+        artifact = worker.poll_once(timestamp=STARTED_AT, active_process_name="Code.exe")
+
+        assert artifact is None
+        assert worker.last_error == "screenshot_storage_error"
+        assert list_screenshots(connection, SESSION_ID) == []
     finally:
         connection.close()
 

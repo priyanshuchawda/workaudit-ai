@@ -108,6 +108,68 @@ pub struct RecorderControlResult {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
+pub enum SessionListStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct SessionSummary {
+    pub id: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub status: String,
+    pub title: Option<String>,
+    pub storage_path: Option<String>,
+    pub privacy_mode: String,
+    pub event_count: i64,
+    pub screenshot_count: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionListResult {
+    pub status: SessionListStatus,
+    pub message: String,
+    pub sessions: Vec<SessionSummary>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionDeletionStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDeletionResult {
+    pub status: SessionDeletionStatus,
+    pub message: String,
+    pub deleted_session_rows: i64,
+    pub deleted_screenshot_files: i64,
+    pub missing_screenshot_files: i64,
+    pub deleted_screenshot_rows: i64,
+    pub removed_artifact_root: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSessionsResponse {
+    sessions: Vec<SessionSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSessionDeletionResponse {
+    deleted_session_rows: i64,
+    deleted_screenshot_files: i64,
+    missing_screenshot_files: i64,
+    deleted_screenshot_rows: i64,
+    removed_artifact_root: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SessionExportStatus {
     Available,
     Unavailable,
@@ -416,6 +478,76 @@ impl SidecarService {
         )
     }
 
+    pub fn sessions(&self) -> SessionListResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_sessions();
+        };
+
+        self.sessions_from_base_url(&base_url)
+    }
+
+    pub fn sessions_from_base_url(&self, base_url: &str) -> SessionListResult {
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_sessions();
+        };
+        let Ok(body_text) = request_local_json(&endpoint, "GET", "/sessions", None) else {
+            return unavailable_sessions();
+        };
+        let Ok(response) = serde_json::from_str::<SidecarSessionsResponse>(&body_text) else {
+            return unavailable_sessions();
+        };
+
+        SessionListResult {
+            status: SessionListStatus::Available,
+            message: "Sessions loaded.".to_string(),
+            sessions: response
+                .sessions
+                .into_iter()
+                .map(SessionSummary::redacted)
+                .collect(),
+        }
+    }
+
+    pub fn delete_session(&self, session_id: String) -> SessionDeletionResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_session_deletion();
+        };
+
+        self.delete_session_from_base_url(session_id, &base_url)
+    }
+
+    pub fn delete_session_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> SessionDeletionResult {
+        if session_id.trim().is_empty() {
+            return unavailable_session_deletion();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_session_deletion();
+        };
+        let path = format!("/sessions/{}", encode_path_segment(&session_id));
+        let Ok(body_text) = request_local_json(&endpoint, "DELETE", &path, None) else {
+            return unavailable_session_deletion();
+        };
+        let Ok(response) = serde_json::from_str::<SidecarSessionDeletionResponse>(&body_text)
+        else {
+            return unavailable_session_deletion();
+        };
+
+        SessionDeletionResult {
+            status: SessionDeletionStatus::Available,
+            message: "Session deleted.".to_string(),
+            deleted_session_rows: response.deleted_session_rows,
+            deleted_screenshot_files: response.deleted_screenshot_files,
+            missing_screenshot_files: response.missing_screenshot_files,
+            deleted_screenshot_rows: response.deleted_screenshot_rows,
+            removed_artifact_root: response.removed_artifact_root,
+        }
+    }
+
     pub fn export_session_markdown(&self, session_id: String) -> SessionExportResult {
         let Some(base_url) = configured_base_url() else {
             return unavailable_export();
@@ -721,6 +853,26 @@ fn unavailable_recorder_control() -> RecorderControlResult {
     }
 }
 
+fn unavailable_sessions() -> SessionListResult {
+    SessionListResult {
+        status: SessionListStatus::Unavailable,
+        message: "Session browser bridge is unavailable.".to_string(),
+        sessions: Vec::new(),
+    }
+}
+
+fn unavailable_session_deletion() -> SessionDeletionResult {
+    SessionDeletionResult {
+        status: SessionDeletionStatus::Unavailable,
+        message: "Session delete bridge is unavailable.".to_string(),
+        deleted_session_rows: 0,
+        deleted_screenshot_files: 0,
+        missing_screenshot_files: 0,
+        deleted_screenshot_rows: 0,
+        removed_artifact_root: false,
+    }
+}
+
 fn unavailable_export() -> SessionExportResult {
     SessionExportResult {
         status: SessionExportStatus::Unavailable,
@@ -765,6 +917,22 @@ impl RecorderSession {
             title: self.title.map(|title| redact_text(&title)),
             storage_path: self.storage_path.map(|path| redact_text(&path)),
             privacy_mode: redact_text(&self.privacy_mode),
+        }
+    }
+}
+
+impl SessionSummary {
+    fn redacted(self) -> Self {
+        Self {
+            id: redact_text(&self.id),
+            started_at: redact_text(&self.started_at),
+            ended_at: self.ended_at.map(|ended_at| redact_text(&ended_at)),
+            status: redact_text(&self.status),
+            title: self.title.map(|title| redact_text(&title)),
+            storage_path: self.storage_path.map(|path| redact_text(&path)),
+            privacy_mode: redact_text(&self.privacy_mode),
+            event_count: self.event_count,
+            screenshot_count: self.screenshot_count,
         }
     }
 }

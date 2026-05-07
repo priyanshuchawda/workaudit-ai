@@ -66,19 +66,19 @@ MVP 4 now includes deterministic recording resource budget checks and a fake 30-
 
 MVP dashboard work now includes desktop-accessible deterministic Markdown and raw JSON export review through the configured local sidecar bridge. The desktop shows preview text, export paths, evidence IDs, safe unavailable/error states, session-folder lookup status, and an honest AI report unavailable state because no real local model runtime is integrated yet.
 
-MVP dashboard work now includes desktop screenshot metadata review and deletion through the configured local sidecar bridge. The desktop lists screenshot evidence IDs, source event IDs, dimensions, byte counts, hashes, and storage paths, and can delete screenshot artifacts through the existing backend endpoint. It does not display screenshot pixels, run OCR, or extract image text.
+MVP dashboard work now includes desktop session browser, session deletion, and folder-open integration through the configured local sidecar bridge. The desktop lists all past sessions with event and screenshot counts, allows deleting any session (removing rows and artifact files), and shows honest deletion result counts. Session folder-open remains a display-only path lookup; no shell launch is wired yet.
 
 ## Two-Minute Review
 
 WorkTrace AI is a local-first desktop recorder and evidence timeline project. The implemented repo currently proves the foundations: typed contracts, SQLite WAL migrations, fake session storage/export, a Tauri shell, sidecar health, deterministic timeline/export/report foundations, model fallback states, selective AI-worker contracts, workflow debugging rules, golden evals, and deterministic resource budget checks.
 
-The project is still a foundation/demo repo. It now has real Windows active-window polling, screenshot capture, metadata-only file watcher capture, explicit safe terminal command ingestion, desktop recorder controls through a configured local sidecar bridge, and a configured sidecar process launch path, but it is not packaged as a full live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
+The project is still a foundation/demo repo. It now has real Windows active-window polling, screenshot capture, metadata-only file watcher capture, explicit safe terminal command ingestion, desktop recorder controls through a configured local sidecar bridge, desktop export review/screenshot metadata/delete UI, and a session browser with session deletion through the sidecar bridge. It is not packaged as a full live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
 
 ## Evidence and Verification
 
 - Shared schema tests validate event, session, timeline, finding, report, privacy, confidence, evidence ID, and model metadata contracts.
 - Python tests validate storage, migrations, fake sessions, session state, privacy redaction, exports, timeline chunks, report guards, optional AI-worker contracts, workflow debugger rules, golden evals, and resource budgets.
-- Desktop tests validate the status shell, sidecar health states, recovery banner preview, raw timeline preview, safe/live session-event bridge states, export review controls, and screenshot metadata/delete states.
+- Desktop tests validate the status shell, sidecar health states, recovery banner preview, raw timeline preview, safe/live session-event bridge states, export review controls, screenshot metadata/delete states, and session browser list/delete behavior.
 - `docs/eval-results.md` records the reproducible golden-session eval command and current aggregate result.
 - `docs/sample-report.md` shows a deterministic evidence-cited sample report from local fixture-style data.
 
@@ -87,7 +87,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL or configured local sidecar binary/port; OCR and model runtimes are still not live.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
-- The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, and screenshot metadata/delete UI. Session deletion and full session browser workflows are not fully wired yet.
+- The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, screenshot metadata/delete UI, and a session browser with session deletion. Session folder-open shows the local path only; no shell open is wired yet.
 - The desktop AI report panel is intentionally unavailable. Real local LLM runtime integration and model downloads are not implemented.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.

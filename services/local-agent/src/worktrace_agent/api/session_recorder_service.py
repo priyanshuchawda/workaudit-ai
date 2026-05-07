@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import shutil
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,9 @@ from worktrace_agent.db.screenshots_repository import (
 )
 from worktrace_agent.db.session_state_repository import (
     SessionTransitionError,
+    delete_session_record,
+    list_sessions,
+    load_session_record,
     pause_session,
     resume_session,
     start_session,
@@ -62,6 +66,28 @@ class SessionExportPreview:
 @dataclass(frozen=True)
 class SessionFolder:
     path: Path
+
+
+@dataclass(frozen=True)
+class SessionSummary:
+    id: str
+    started_at: str
+    ended_at: str | None
+    status: str
+    title: str | None
+    storage_path: str | None
+    privacy_mode: str
+    event_count: int
+    screenshot_count: int
+
+
+@dataclass(frozen=True)
+class SessionDeletionResult:
+    deleted_session_rows: int
+    deleted_screenshot_files: int
+    missing_screenshot_files: int
+    deleted_screenshot_rows: int
+    removed_artifact_root: bool
 
 
 class SessionRecorderService:
@@ -153,6 +179,25 @@ class SessionRecorderService:
             return []
         return list_raw_events(self._connection, resolved_session_id)
 
+    def list_sessions(self) -> list[SessionSummary]:
+        sessions = list_sessions(self._connection)
+        event_counts = self._count_rows_by_session("raw_events")
+        screenshot_counts = self._count_rows_by_session("screenshots")
+        return [
+            SessionSummary(
+                id=session.id,
+                started_at=session.started_at,
+                ended_at=session.ended_at,
+                status=session.status.value,
+                title=session.title,
+                storage_path=session.storage_path,
+                privacy_mode=session.privacy_mode,
+                event_count=event_counts.get(session.id, 0),
+                screenshot_count=screenshot_counts.get(session.id, 0),
+            )
+            for session in sessions
+        ]
+
     def ingest_terminal_command(
         self,
         *,
@@ -226,6 +271,32 @@ class SessionRecorderService:
         resolved_session_id = self._require_session_id(session_id)
         return SessionFolder(path=self._artifact_root_for_session_id(resolved_session_id))
 
+    async def delete_session(self, *, session_id: str) -> SessionDeletionResult:
+        resolved_session_id = self._require_session_id(session_id)
+        await self._stop_workers_for_session(resolved_session_id)
+        session = load_session_record(self._connection, resolved_session_id)
+        if session is None:
+            raise ValueError(f"Unknown session: {session_id}")
+
+        screenshot_result = delete_screenshots_for_session(
+            self._connection,
+            session_id=resolved_session_id,
+            artifact_root=self._artifact_root_for_session(session),
+        )
+        deleted_rows = delete_session_record(self._connection, session_id=resolved_session_id)
+        removed_artifact_root = self._remove_default_artifact_root_for_session_id(
+            resolved_session_id,
+            session,
+        )
+
+        return SessionDeletionResult(
+            deleted_session_rows=deleted_rows,
+            deleted_screenshot_files=screenshot_result.deleted_files,
+            missing_screenshot_files=screenshot_result.missing_files,
+            deleted_screenshot_rows=screenshot_result.deleted_rows,
+            removed_artifact_root=removed_artifact_root,
+        )
+
     def close(self) -> None:
         self._connection.close()
 
@@ -260,6 +331,18 @@ class SessionRecorderService:
 
     def _evidence_ids_for_session(self, session_id: str) -> list[str]:
         return [event.id for event in list_raw_events(self._connection, session_id)]
+
+    def _count_rows_by_session(self, table_name: str) -> dict[str, int]:
+        if table_name not in {"raw_events", "screenshots"}:
+            raise ValueError("Unsupported session count table")
+        rows = self._connection.execute(
+            f"""
+            SELECT session_id, COUNT(*) AS row_count
+            FROM {table_name}
+            GROUP BY session_id
+            """
+        ).fetchall()
+        return {str(row["session_id"]): int(row["row_count"]) for row in rows}
 
     def _active_process_name(self) -> str | None:
         try:
@@ -359,6 +442,27 @@ class SessionRecorderService:
         if base.name == "db":
             base = base.parent
         return base / "sessions" / session_id
+
+    def _remove_default_artifact_root_for_session_id(
+        self,
+        session_id: str,
+        session: SessionRecord,
+    ) -> bool:
+        default_root = self._artifact_root_for_session_id(session_id)
+        if session.storage_path is not None and Path(session.storage_path) != default_root:
+            return False
+        if not default_root.exists():
+            return False
+
+        resolved_root = default_root.resolve()
+        resolved_sessions_root = default_root.parent.resolve()
+        if resolved_root.parent != resolved_sessions_root or resolved_root.name != session_id:
+            raise ValueError("session artifact root is outside the managed sessions directory")
+        if not resolved_root.is_dir():
+            raise ValueError("session artifact root is not a directory")
+
+        shutil.rmtree(resolved_root)
+        return True
 
 
 @dataclass

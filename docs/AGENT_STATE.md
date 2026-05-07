@@ -1,69 +1,51 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 12:44 local / 2026-05-07 07:14 UTC
+2026-05-07 12:55 local / 2026-05-07 07:25 UTC
 
 ## Current Issue
-#71 - Screenshot metadata drawer and delete screenshots UI
+#73 - Session browser, delete session, and open session folder
 
 ## Current Branch
-codex/issue-71-screenshot-metadata-ui
+codex/issue-73-session-browser-delete
 
 ## Current Phase
-PR
+Red tests
 
 ## Completed Since Last Update
-- Merged PR #70 for #69: https://github.com/priyanshuchawda/workaudit-ai/pull/70
-- Confirmed Issue #69 is closed.
-- Created Issue #71: https://github.com/priyanshuchawda/workaudit-ai/issues/71
-- Created branch `codex/issue-71-screenshot-metadata-ui`.
-- Read required docs and relevant screenshot backend/Tauri/frontend files.
-- Wrote #71 implementation plan at `docs/superpowers/plans/2026-05-07-screenshot-metadata-ui.md`.
-- Added a backend red test for `/sessions/latest/screenshots` deletion and implemented the alias-resolution fix after confirming the expected failure.
-- Added Rust red tests for screenshot metadata and deletion bridge commands.
-- Implemented Rust/Tauri screenshot metadata and deletion bridge commands.
-- Added React red tests for screenshot metadata loading, metadata-only preview, deletion counts, and unavailable states.
-- Implemented typed desktop screenshot client wrappers and the screenshot evidence panel.
-- Updated README to describe screenshot metadata/delete UI honestly and keep OCR/image-text extraction out of scope.
-- Completed the full #71 quality gate after fixing a TypeScript narrowing issue, a React hook lint issue, and Rust formatting drift.
-- Committed #71 implementation as `5d5806d feat: add screenshot evidence review`.
-- Pushed branch `codex/issue-71-screenshot-metadata-ui`.
-- Opened PR #72: https://github.com/priyanshuchawda/workaudit-ai/pull/72
+- Merged PR #72 for #71: https://github.com/priyanshuchawda/workaudit-ai/pull/72
+- Confirmed Issue #71 is closed.
+- Created Issue #73: https://github.com/priyanshuchawda/workaudit-ai/issues/73
+- Created branch `codex/issue-73-session-browser-delete`.
+- Read required docs and relevant session backend/Tauri/frontend files for #73.
+- Wrote #73 implementation plan at `docs/superpowers/plans/2026-05-07-session-browser-delete.md`.
+- Added backend red tests for session listing/counts, session deletion/artifact cleanup, and unknown session deletion.
+- Implemented backend session listing and safe session deletion routes/service/repository methods.
+- Added Rust red tests for session browser list/delete bridge commands and safe unavailable states.
 
 ## Current Local Changes
-- `docs/AGENT_STATE.md` only, recording the PR URL/state update.
+- `docs/AGENT_STATE.md`
+- `docs/superpowers/plans/2026-05-07-session-browser-delete.md`
+- `services/local-agent/tests/api/test_sessions.py`
+- `services/local-agent/src/worktrace_agent/api/routes/sessions.py`
+- `services/local-agent/src/worktrace_agent/api/session_recorder_service.py`
+- `services/local-agent/src/worktrace_agent/db/session_state_repository.py`
+- `apps/desktop/src-tauri/tests/sidecar_service.rs`
 
 ## Tests Run
-- PR #70 GitGuardian checks - passed before merge.
-- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_latest_session_screenshots_can_be_listed_and_deleted -q` - failed as expected before implementation because delete used the literal `latest` id.
-- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_latest_session_screenshots_can_be_listed_and_deleted -q` - passed after alias-resolution fix.
-- `cargo test screenshots --test sidecar_service` - failed as expected because screenshot bridge commands/types are not implemented yet.
-- `cargo test screenshots --test sidecar_service` - passed after Rust bridge implementation.
-- `cargo test screenshot --test sidecar_service` - passed including safe unavailable command fallback.
-- `pnpm --dir apps/desktop test -- App.test.tsx` - failed as expected before screenshot UI implementation.
-- `pnpm --dir apps/desktop test -- App.test.tsx` - passed after screenshot UI implementation.
-- `uv run --python 3.13 ruff format .` - passed; formatted 2 Python files.
-- `uv run --python 3.13 ruff check .` - passed.
-- `uv run --python 3.13 pyright` - passed.
-- `uv run --python 3.13 pytest` - passed, 143 tests.
-- `pnpm --dir packages/shared typecheck` - passed.
-- `pnpm --dir packages/shared test` - passed, 14 tests.
-- `pnpm --dir apps/desktop typecheck` - failed once on screenshot panel narrowing, then passed after fixing.
-- `pnpm --dir apps/desktop lint` - failed once on synchronous setState in screenshot effect, then passed after moving updates into the async sidecar sync flow.
-- `pnpm --dir apps/desktop test` - passed, 20 tests.
-- `pnpm --dir apps/desktop build` - passed.
-- `cargo fmt --all -- --check` - failed once on formatting drift, then passed after `cargo fmt --all`.
-- `cargo clippy --workspace --all-targets -- -D warnings` - passed.
-- `cargo test --workspace` - passed, 20 integration tests.
+- PR #72 GitGuardian checks - passed before merge.
+- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_list_sessions_returns_newest_first_with_counts tests/api/test_sessions.py::test_delete_session_removes_rows_and_default_artifacts tests/api/test_sessions.py::test_delete_unknown_session_returns_safe_error -q` - failed as expected because session list/delete endpoints do not exist yet.
+- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_list_sessions_returns_newest_first_with_counts tests/api/test_sessions.py::test_delete_session_removes_rows_and_default_artifacts tests/api/test_sessions.py::test_delete_unknown_session_returns_safe_error -q` - passed after backend implementation.
+- `cargo test session_browser --test sidecar_service` - failed as expected because session list/delete bridge commands/types are not implemented yet.
 
 ## Tests Not Run
-- None for #71 at this point.
+- Full gate for #73 - not run yet because red tests and implementation are in progress.
 
 ## Known Blockers
 - None requiring human input.
 
 ## Next Exact Step
-Commit and push this state update, wait for PR #72 checks, then merge if checks pass.
+Implement minimal Rust/Tauri session list/delete bridge commands so the new focused Rust tests pass.
 
 ## Do Not Forget
 - No OCR before OCR issue.

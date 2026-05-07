@@ -5,6 +5,7 @@ pub mod services;
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            commands::sidecar::delete_session,
             commands::sidecar::delete_session_screenshots,
             commands::sidecar::export_session_markdown,
             commands::sidecar::export_session_raw_json,
@@ -12,6 +13,7 @@ pub fn run() {
             commands::sidecar::get_session_events,
             commands::sidecar::get_session_folder,
             commands::sidecar::get_session_screenshots,
+            commands::sidecar::get_sessions,
             commands::sidecar::pause_recording_session,
             commands::sidecar::resume_recording_session,
             commands::sidecar::start_recording_session,

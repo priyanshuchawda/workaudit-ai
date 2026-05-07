@@ -11,4 +11,4 @@ Rules:
 - Cancellation and timeout behavior must be added before long-running inference becomes user-facing.
 - AI report generation must run only after stop or manual request.
 
-For #79, only selective OCR runtime guardrails are in scope. LLM, embedding, audio, and VLM runtime execution remains out of scope.
+For #81, model cache metadata and disk-space checks are in scope. LLM, embedding, audio, OCR package, and VLM runtime execution remains out of scope.

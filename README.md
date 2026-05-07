@@ -48,7 +48,7 @@ MVP 1E now includes a deterministic Python timeline chunker that turns raw event
 
 MVP 1E now includes deterministic Markdown export with evidence references plus the existing redacted raw JSON export path.
 
-MVP 1F now includes typed local model availability and fallback states so deterministic recording, timeline, and export paths can run without an AI model installed. This does not implement local model loading or LLM report generation yet.
+MVP 1F now includes typed local model availability, fallback states, and a metadata-only model cache manager with deterministic local cache paths, disk-space checks, and checksum validation. Deterministic recording, timeline, and export paths can run without an AI model installed. This does not implement model downloads, local model loading, or LLM report generation yet.
 
 MVP 1F now includes an evidence-cited local LLM report generation foundation with prompt construction, Pydantic output validation, invalid JSON retry, and hallucination guards. This uses a local model client contract only; no real model runtime, model download, or report UI is implemented yet.
 
@@ -90,9 +90,10 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
 - The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, screenshot metadata/delete UI, and a session browser with session deletion. Session folder-open shows the local path only; no shell open is wired yet.
 - The desktop AI report panel is intentionally unavailable. Real local LLM runtime integration and model downloads are not implemented.
+- A metadata-only model cache manager exists for local paths, disk checks, and checksum validation. It does not perform network downloads or load models.
 - Selective OCR remains backend/runtime-contract work. The desktop screenshot panel does not yet show stored OCR snippets, and no real OCR smoke has been run in this PR.
 - Python sidecar packaging is not bundled into the installer unless `pnpm --dir apps/desktop package:sidecar` first produces the expected target-triple sidecar executable for Tauri. The Windows installer build smoke has passed locally with that artifact present, but installer install/run QA has not been performed.
-- Local model runtimes and model downloads are not integrated.
+- Local model runtimes and automatic model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.
 - Resource budget checks use deterministic fake samples plus storage cleanup tests, not a live Windows recording benchmark.
 

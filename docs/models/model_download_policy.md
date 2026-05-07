@@ -12,4 +12,4 @@ Rules:
 - Runtime states must include not installed, unavailable, too slow, failed safely, and ready.
 - Failures must never corrupt session rows, raw events, screenshots, exports, or OCR results.
 
-For #79, no model download is implemented. OCR runtime support must be optional and safe when OCR packages are absent.
+For #81, a metadata-only cache manager may inspect local files, validate checksums, and decide whether a future explicit download could be offered. It must not perform network downloads or load model runtimes.

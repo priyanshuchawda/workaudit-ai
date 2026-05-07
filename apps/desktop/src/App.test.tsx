@@ -2,10 +2,12 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
+  deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
   getSessionEvents,
   getSessionFolder,
+  getSessionScreenshots,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -14,17 +16,21 @@ import {
   stopRecordingSession,
   stopSidecar,
   type RecorderControlResult,
+  type ScreenshotDeletionResult,
   type SessionExportResult,
   type SessionEventsResult,
   type SessionFolderResult,
+  type SessionScreenshotsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
 vi.mock("./lib/tauri-client", () => ({
+  deleteSessionScreenshots: vi.fn(),
   exportSessionMarkdown: vi.fn(),
   exportSessionRawJson: vi.fn(),
   getSessionEvents: vi.fn(),
   getSessionFolder: vi.fn(),
+  getSessionScreenshots: vi.fn(),
   getSidecarHealth: vi.fn(),
   pauseRecordingSession: vi.fn(),
   resumeRecordingSession: vi.fn(),
@@ -57,6 +63,8 @@ const healthySidecar: SidecarHealth = {
 
 const getSidecarHealthMock = vi.mocked(getSidecarHealth);
 const getSessionEventsMock = vi.mocked(getSessionEvents);
+const getSessionScreenshotsMock = vi.mocked(getSessionScreenshots);
+const deleteSessionScreenshotsMock = vi.mocked(deleteSessionScreenshots);
 const exportSessionMarkdownMock = vi.mocked(exportSessionMarkdown);
 const exportSessionRawJsonMock = vi.mocked(exportSessionRawJson);
 const getSessionFolderMock = vi.mocked(getSessionFolder);
@@ -129,9 +137,52 @@ const folderResult: SessionFolderResult = {
   path: "C:/WorkTrace/sessions/sess_live_001",
 };
 
+const screenshotMetadata: SessionScreenshotsResult = {
+  status: "available",
+  message: "Screenshot metadata loaded.",
+  screenshots: [
+    {
+      id: "shot_001",
+      sessionId: "sess_live_001",
+      sourceEventId: "evt_screen_001",
+      timestamp: "2026-05-06T09:14:10+05:30",
+      width: 1920,
+      height: 1080,
+      storedWidth: 960,
+      storedHeight: 540,
+      byteSize: 12345,
+      contentHash: "content_hash_001",
+      visualHash: "visual_hash_001",
+      storagePath: "screenshots/shot_001.png",
+    },
+  ],
+};
+
+const screenshotDeletion: ScreenshotDeletionResult = {
+  status: "available",
+  message: "Screenshots deleted.",
+  deletedFiles: 1,
+  missingFiles: 0,
+  deletedRows: 1,
+};
+
 beforeEach(() => {
   getSessionEventsMock.mockReset();
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
+  getSessionScreenshotsMock.mockReset();
+  getSessionScreenshotsMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Screenshot metadata bridge is unavailable.",
+    screenshots: [],
+  });
+  deleteSessionScreenshotsMock.mockReset();
+  deleteSessionScreenshotsMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Screenshot delete bridge is unavailable.",
+    deletedFiles: 0,
+    missingFiles: 0,
+    deletedRows: 0,
+  });
   exportSessionMarkdownMock.mockReset();
   exportSessionMarkdownMock.mockResolvedValue({
     status: "unavailable",
@@ -356,8 +407,100 @@ test("renders session dashboard surfaces with honest unavailable actions", async
   expect(screen.getByRole("button", { name: "Export Markdown" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Export raw JSON" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Open session folder" })).toBeDisabled();
-  expect(screen.getByText("Screenshot metadata bridge unavailable")).toBeInTheDocument();
+  expect(screen.getByText("Connect to a live sidecar session before reviewing screenshots.")).toBeInTheDocument();
   expect(screen.getByText("AI report unavailable")).toBeInTheDocument();
+});
+
+test("loads screenshot metadata and shows a safe preview for a live sidecar session", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  getSessionScreenshotsMock.mockResolvedValue(screenshotMetadata);
+
+  render(<App />);
+
+  const screenshotPanel = await screen.findByRole("region", { name: "Screenshot evidence" });
+
+  expect(await within(screenshotPanel).findByText("Screenshot metadata loaded.")).toBeInTheDocument();
+  expect(getSessionScreenshotsMock).toHaveBeenCalledWith("latest");
+  expect(within(screenshotPanel).getAllByText("shot_001").length).toBeGreaterThan(0);
+  expect(within(screenshotPanel).getAllByText("evt_screen_001").length).toBeGreaterThan(0);
+  expect(within(screenshotPanel).getByText("1920 x 1080 original")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("960 x 540 stored")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("screenshots/shot_001.png")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("No OCR or image text extraction has run.")).toBeInTheDocument();
+});
+
+test("deletes screenshots through the desktop bridge and shows deletion counts", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  getSessionScreenshotsMock.mockResolvedValue(screenshotMetadata);
+  deleteSessionScreenshotsMock.mockResolvedValue(screenshotDeletion);
+
+  render(<App />);
+
+  const screenshotPanel = await screen.findByRole("region", { name: "Screenshot evidence" });
+  expect((await within(screenshotPanel).findAllByText("shot_001")).length).toBeGreaterThan(0);
+
+  fireEvent.click(within(screenshotPanel).getByRole("button", { name: "Delete screenshots" }));
+
+  expect(deleteSessionScreenshotsMock).toHaveBeenCalledWith("latest");
+  expect(await within(screenshotPanel).findByText("Screenshots deleted.")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("1 row deleted")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("1 file deleted")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByText("No screenshot metadata for this session.")).toBeInTheDocument();
+});
+
+test("shows safe screenshot unavailable state for a live sidecar session", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  getSessionScreenshotsMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Screenshot metadata bridge is unavailable.",
+    screenshots: [],
+  });
+
+  render(<App />);
+
+  const screenshotPanel = await screen.findByRole("region", { name: "Screenshot evidence" });
+
+  expect(await within(screenshotPanel).findByText("Screenshot metadata bridge is unavailable.")).toBeInTheDocument();
+  expect(within(screenshotPanel).getByRole("button", { name: "Delete screenshots" })).toBeDisabled();
 });
 
 test("exports markdown and raw JSON previews for a live sidecar session", async () => {

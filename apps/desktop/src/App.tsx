@@ -8,10 +8,12 @@ import {
   type RawTimelineEvent,
 } from "./features/timeline/raw-timeline-simulation";
 import {
+  deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
   getSessionEvents,
   getSessionFolder,
+  getSessionScreenshots,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -21,10 +23,13 @@ import {
   stopSidecar,
   type RecorderControlResult,
   type RecorderSession,
+  type ScreenshotDeletionResult,
   type SessionExportPreview,
   type SessionExportResult,
   type SessionEventsResult,
   type SessionFolderResult,
+  type SessionScreenshot,
+  type SessionScreenshotsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
@@ -73,6 +78,14 @@ type FolderReviewState =
   | { status: "idle" | "loading" | "unavailable"; message: string; path: null }
   | { status: "success"; message: string; path: string };
 
+type ScreenshotReviewState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; screenshots: [] }
+  | { status: "success"; message: string; screenshots: SessionScreenshot[] };
+
+type ScreenshotDeletionState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; result: null }
+  | { status: "success"; message: string; result: ScreenshotDeletionResult };
+
 const eventFilters: { label: string; value: EventFilter }[] = [
   { label: "All", value: "all" },
   { label: "Active windows", value: "active_window" },
@@ -106,6 +119,18 @@ const initialFolderReviewState: FolderReviewState = {
   path: null,
 };
 
+const initialScreenshotReviewState: ScreenshotReviewState = {
+  status: "idle",
+  message: "Connect to a live sidecar session before reviewing screenshots.",
+  screenshots: [],
+};
+
+const initialScreenshotDeletionState: ScreenshotDeletionState = {
+  status: "idle",
+  message: "No screenshot deletion has run yet.",
+  result: null,
+};
+
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
@@ -117,6 +142,11 @@ function App() {
     useState<ExportReviewState>(initialExportReviewState);
   const [folderReview, setFolderReview] =
     useState<FolderReviewState>(initialFolderReviewState);
+  const [screenshotReview, setScreenshotReview] =
+    useState<ScreenshotReviewState>(initialScreenshotReviewState);
+  const [screenshotDeletion, setScreenshotDeletion] =
+    useState<ScreenshotDeletionState>(initialScreenshotDeletionState);
+  const [selectedScreenshotId, setSelectedScreenshotId] = useState<string | null>(null);
   const sourceEvents: RawTimelineEvent[] =
     sessionEvents.status === "available" ? sessionEvents.events : rawTimelineSimulationEvents;
   const timelineEvents =
@@ -287,6 +317,56 @@ function App() {
     applyFolderResult(await getSessionFolder(reviewSessionId));
   };
 
+  const applyScreenshotResult = (result: SessionScreenshotsResult) => {
+    if (result.status === "unavailable") {
+      setScreenshotReview({
+        status: "unavailable",
+        message: result.message,
+        screenshots: [],
+      });
+      setSelectedScreenshotId(null);
+      return;
+    }
+
+    setScreenshotReview({
+      status: "success",
+      message: result.message,
+      screenshots: result.screenshots,
+    });
+    setSelectedScreenshotId(result.screenshots[0]?.id ?? null);
+  };
+
+  const handleDeleteScreenshots = async () => {
+    if (!reviewSessionId) {
+      return;
+    }
+    setScreenshotDeletion({
+      status: "loading",
+      message: "Deleting screenshot artifacts.",
+      result: null,
+    });
+    const result = await deleteSessionScreenshots(reviewSessionId);
+    if (result.status === "unavailable") {
+      setScreenshotDeletion({
+        status: "unavailable",
+        message: result.message,
+        result: null,
+      });
+      return;
+    }
+    setScreenshotDeletion({
+      status: "success",
+      message: result.message,
+      result,
+    });
+    setScreenshotReview({
+      status: "success",
+      message: "Screenshot metadata loaded.",
+      screenshots: [],
+    });
+    setSelectedScreenshotId(null);
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -301,6 +381,38 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void Promise.resolve().then(async () => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (!reviewSessionId) {
+        setScreenshotReview(initialScreenshotReviewState);
+        setScreenshotDeletion(initialScreenshotDeletionState);
+        setSelectedScreenshotId(null);
+        return;
+      }
+
+      setScreenshotReview({
+        status: "loading",
+        message: "Loading screenshot metadata.",
+        screenshots: [],
+      });
+      setScreenshotDeletion(initialScreenshotDeletionState);
+      const result = await getSessionScreenshots(reviewSessionId);
+      if (isMounted) {
+        applyScreenshotResult(result);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [reviewSessionId]);
 
   return (
     <main className="min-h-screen bg-stone-100 text-zinc-950">
@@ -458,25 +570,14 @@ function App() {
           </div>
 
           <aside className="space-y-4">
-            <section
-              aria-label="Screenshot evidence"
-              className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
-            >
-              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
-                Screenshots
-              </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-normal">Screenshot evidence</h2>
-              <p className="mt-3 text-sm leading-6 text-zinc-700">
-                Screenshot metadata bridge unavailable
-              </p>
-              <button
-                className="mt-4 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-500 disabled:cursor-not-allowed disabled:opacity-70"
-                disabled
-                type="button"
-              >
-                Delete screenshots
-              </button>
-            </section>
+            <ScreenshotEvidencePanel
+              canReview={Boolean(reviewSessionId)}
+              deletionState={screenshotDeletion}
+              onDelete={handleDeleteScreenshots}
+              onSelect={setSelectedScreenshotId}
+              selectedScreenshotId={selectedScreenshotId}
+              state={screenshotReview}
+            />
 
             <ExportReviewPanel
               canReview={Boolean(reviewSessionId)}
@@ -588,6 +689,159 @@ function RecorderControlPanel({
         </div>
       </div>
     </article>
+  );
+}
+
+function ScreenshotEvidencePanel({
+  canReview,
+  deletionState,
+  onDelete,
+  onSelect,
+  selectedScreenshotId,
+  state,
+}: {
+  canReview: boolean;
+  deletionState: ScreenshotDeletionState;
+  onDelete: () => void;
+  onSelect: (screenshotId: string) => void;
+  selectedScreenshotId: string | null;
+  state: ScreenshotReviewState;
+}) {
+  const selectedScreenshot =
+    state.status === "success"
+      ? state.screenshots.find((screenshot) => screenshot.id === selectedScreenshotId) ??
+        state.screenshots[0] ??
+        null
+      : null;
+  const isScreenshotLoading = state.status === "loading";
+  const hasScreenshots = state.status === "success" && state.screenshots.length > 0;
+  const deleteDisabled =
+    !canReview ||
+    isScreenshotLoading ||
+    !hasScreenshots ||
+    deletionState.status === "loading";
+
+  return (
+    <section
+      aria-label="Screenshot evidence"
+      className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
+    >
+      <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+        Screenshots
+      </p>
+      <h2 className="mt-2 text-xl font-semibold tracking-normal">Screenshot evidence</h2>
+      <p className="mt-3 text-sm leading-6 text-zinc-700">{state.message}</p>
+      <p className="mt-2 text-sm leading-6 text-zinc-700">
+        No OCR or image text extraction has run.
+      </p>
+
+      <button
+        className="mt-4 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-70"
+        disabled={deleteDisabled}
+        onClick={onDelete}
+        type="button"
+      >
+        Delete screenshots
+      </button>
+
+      {deletionState.status !== "idle" ? (
+        <div
+          aria-live="polite"
+          className={`mt-3 rounded-md border p-3 text-sm ${
+            deletionState.status === "unavailable"
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-zinc-200 bg-zinc-50 text-zinc-800"
+          }`}
+        >
+          <p className="font-semibold text-zinc-950">{deletionState.message}</p>
+          {deletionState.result ? (
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+              <Metric
+                label="Rows"
+                value={`${deletionState.result.deletedRows} row deleted`}
+              />
+              <Metric
+                label="Files"
+                value={`${deletionState.result.deletedFiles} file deleted`}
+              />
+              <Metric
+                label="Missing"
+                value={`${deletionState.result.missingFiles} missing`}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-4 space-y-3">
+        {state.status === "loading" ? (
+          <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+            Loading screenshot metadata.
+          </p>
+        ) : null}
+        {state.status === "success" && state.screenshots.length === 0 ? (
+          <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+            No screenshot metadata for this session.
+          </p>
+        ) : null}
+        {hasScreenshots ? (
+          <ul className="space-y-2">
+            {state.screenshots.map((screenshot) => (
+              <li key={screenshot.id}>
+                <button
+                  className={`w-full rounded-md border p-3 text-left text-sm ${
+                    selectedScreenshot?.id === screenshot.id
+                      ? "border-zinc-950 bg-zinc-50"
+                      : "border-zinc-200 bg-white"
+                  }`}
+                  onClick={() => onSelect(screenshot.id)}
+                  type="button"
+                >
+                  <span className="block font-semibold text-zinc-950">{screenshot.id}</span>
+                  <span className="mt-1 block text-xs text-zinc-600">
+                    {screenshot.sourceEventId ?? "No source event"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      {selectedScreenshot ? (
+        <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-800">
+          <h3 className="font-semibold tracking-normal text-zinc-950">Preview metadata</h3>
+          <dl className="mt-3 space-y-2">
+            <MetadataRow label="Evidence ID" value={selectedScreenshot.id} />
+            <MetadataRow
+              label="Source event"
+              value={selectedScreenshot.sourceEventId ?? "none"}
+            />
+            <MetadataRow
+              label="Original"
+              value={`${selectedScreenshot.width} x ${selectedScreenshot.height} original`}
+            />
+            <MetadataRow
+              label="Stored"
+              value={`${selectedScreenshot.storedWidth} x ${selectedScreenshot.storedHeight} stored`}
+            />
+            <MetadataRow label="Bytes" value={selectedScreenshot.byteSize.toString()} />
+            <MetadataRow label="Path" value={selectedScreenshot.storagePath} />
+            <MetadataRow label="Content hash" value={selectedScreenshot.contentHash} />
+            <MetadataRow label="Visual hash" value={selectedScreenshot.visualHash} />
+          </dl>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MetadataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-1">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dd className="break-all text-sm text-zinc-800">{value}</dd>
+    </div>
   );
 }
 

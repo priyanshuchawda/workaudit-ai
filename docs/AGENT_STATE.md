@@ -1,66 +1,77 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 12:16 local / 2026-05-07 06:46 UTC
+2026-05-07 12:40 local / 2026-05-07 07:10 UTC
 
 ## Current Issue
-#69 - Implement export and report review UX
+#71 - Screenshot metadata drawer and delete screenshots UI
 
 ## Current Branch
-codex/issue-69-export-review-ux
+codex/issue-71-screenshot-metadata-ui
 
 ## Current Phase
-PR
+Full gate
 
 ## Completed Since Last Update
-- Created Issue #69 and branch `codex/issue-69-export-review-ux`.
-- Added `docs/superpowers/plans/2026-05-07-export-review-ux.md` mini implementation plan for #69.
-- Added failing FastAPI tests for Markdown/raw JSON export endpoints and session folder lookup.
-- Added initial FastAPI service/route implementation for deterministic export previews.
-- Confirmed focused FastAPI session API tests pass locally.
-- Added Rust/Tauri export bridge tests for safe unavailable state, localhost export preview success, session folder lookup, and empty session ID rejection.
-- Implemented Rust/Tauri export and session folder bridge commands.
-- Added desktop export review tests for enabled live-session actions, deterministic preview rendering, evidence IDs, folder lookup status, safe unavailable errors, and AI report unavailable state.
-- Implemented typed frontend export/folder client wrappers and the desktop export/report review panel.
-- Updated README and claim-discipline tests for the new deterministic desktop export review scope.
-- Ran the full quality gate successfully.
-- Committed `feat: add export review UX` (`c6063d5`).
-- Pushed branch `codex/issue-69-export-review-ux`.
-- Opened PR #70: https://github.com/priyanshuchawda/workaudit-ai/pull/70
+- Merged PR #70 for #69: https://github.com/priyanshuchawda/workaudit-ai/pull/70
+- Confirmed Issue #69 is closed.
+- Created Issue #71: https://github.com/priyanshuchawda/workaudit-ai/issues/71
+- Created branch `codex/issue-71-screenshot-metadata-ui`.
+- Read required docs and relevant screenshot backend/Tauri/frontend files.
+- Wrote #71 implementation plan at `docs/superpowers/plans/2026-05-07-screenshot-metadata-ui.md`.
+- Added a backend red test for `/sessions/latest/screenshots` deletion and implemented the alias-resolution fix after confirming the expected failure.
+- Added Rust red tests for screenshot metadata and deletion bridge commands.
+- Implemented Rust/Tauri screenshot metadata and deletion bridge commands.
+- Added React red tests for screenshot metadata loading, metadata-only preview, deletion counts, and unavailable states.
+- Implemented typed desktop screenshot client wrappers and the screenshot evidence panel.
+- Updated README to describe screenshot metadata/delete UI honestly and keep OCR/image-text extraction out of scope.
+- Completed the full #71 quality gate after fixing a TypeScript narrowing issue, a React hook lint issue, and Rust formatting drift.
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
+- `docs/superpowers/plans/2026-05-07-screenshot-metadata-ui.md`
+- `README.md`
+- `services/local-agent/tests/api/test_sessions.py`
+- `services/local-agent/src/worktrace_agent/api/session_recorder_service.py`
+- `apps/desktop/src-tauri/src/commands/sidecar.rs`
+- `apps/desktop/src-tauri/src/lib.rs`
+- `apps/desktop/src-tauri/src/services/sidecar.rs`
+- `apps/desktop/src-tauri/tests/sidecar_service.rs`
+- `apps/desktop/src/lib/tauri-client.ts`
+- `apps/desktop/src/App.tsx`
+- `apps/desktop/src/App.test.tsx`
 
 ## Tests Run
-- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_export_session_markdown_and_raw_json_from_api -q` - passed.
-- `uv run --python 3.13 pytest tests/api/test_sessions.py -q` - passed, 12 tests.
-- `cargo test export --test sidecar_service` - first failed on missing export/folder APIs after fixing a malformed test string, then passed, 3 tests.
-- `pnpm --dir apps/desktop test -- --run App.test.tsx` - first failed on old placeholder export UI, then passed, 17 tests.
-- `uv run --python 3.13 pytest tests/api/test_sessions.py -q` - passed, 12 tests.
-- `cargo test export --test sidecar_service` - passed, 3 export-filtered tests.
-- `pnpm --dir apps/desktop test -- --run App.test.tsx` - passed, 17 tests.
-- `uv run --python 3.13 ruff format .` - passed; formatted changed Python files.
+- PR #70 GitGuardian checks - passed before merge.
+- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_latest_session_screenshots_can_be_listed_and_deleted -q` - failed as expected before implementation because delete used the literal `latest` id.
+- `uv run --python 3.13 pytest tests/api/test_sessions.py::test_latest_session_screenshots_can_be_listed_and_deleted -q` - passed after alias-resolution fix.
+- `cargo test screenshots --test sidecar_service` - failed as expected because screenshot bridge commands/types are not implemented yet.
+- `cargo test screenshots --test sidecar_service` - passed after Rust bridge implementation.
+- `cargo test screenshot --test sidecar_service` - passed including safe unavailable command fallback.
+- `pnpm --dir apps/desktop test -- App.test.tsx` - failed as expected before screenshot UI implementation.
+- `pnpm --dir apps/desktop test -- App.test.tsx` - passed after screenshot UI implementation.
+- `uv run --python 3.13 ruff format .` - passed; formatted 2 Python files.
 - `uv run --python 3.13 ruff check .` - passed.
 - `uv run --python 3.13 pyright` - passed.
-- `uv run --python 3.13 pytest` - passed, 142 tests.
+- `uv run --python 3.13 pytest` - passed, 143 tests.
 - `pnpm --dir packages/shared typecheck` - passed.
 - `pnpm --dir packages/shared test` - passed, 14 tests.
-- `pnpm --dir apps/desktop typecheck` - passed.
-- `pnpm --dir apps/desktop lint` - passed.
-- `pnpm --dir apps/desktop test` - passed, 17 tests.
+- `pnpm --dir apps/desktop typecheck` - failed once on screenshot panel narrowing, then passed after fixing.
+- `pnpm --dir apps/desktop lint` - failed once on synchronous setState in screenshot effect, then passed after moving updates into the async sidecar sync flow.
+- `pnpm --dir apps/desktop test` - passed, 20 tests.
 - `pnpm --dir apps/desktop build` - passed.
-- `cargo fmt --all -- --check` - first failed on new Rust test formatting, then passed after `cargo fmt --all`.
+- `cargo fmt --all -- --check` - failed once on formatting drift, then passed after `cargo fmt --all`.
 - `cargo clippy --workspace --all-targets -- -D warnings` - passed.
-- `cargo test --workspace` - passed, 17 integration tests.
+- `cargo test --workspace` - passed, 20 integration tests.
 
 ## Tests Not Run
-- Full gate - not run yet because #69 implementation is incomplete.
+- None for #71 at this point.
 
 ## Known Blockers
 - None requiring human input.
 
 ## Next Exact Step
-Wait for PR #70 checks, inspect/fix any failures, then merge PR #70 after checks pass and continue to the screenshot metadata drawer/delete screenshots issue.
+Run final diff hygiene, commit #71, push the branch, and open a PR with the full gate results.
 
 ## Do Not Forget
 - No OCR before OCR issue.

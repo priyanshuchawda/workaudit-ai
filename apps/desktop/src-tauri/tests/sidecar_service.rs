@@ -7,13 +7,13 @@ use std::{
     thread,
 };
 use worktrace_desktop_lib::commands::sidecar::{
-    export_session_markdown, export_session_raw_json, get_session_events, get_session_folder,
-    pause_recording_session, resume_recording_session, start_recording_session,
-    stop_recording_session,
+    delete_session_screenshots, export_session_markdown, export_session_raw_json,
+    get_session_events, get_session_folder, get_session_screenshots, pause_recording_session,
+    resume_recording_session, start_recording_session, stop_recording_session,
 };
 use worktrace_desktop_lib::services::sidecar::{
-    RecorderControlStatus, SessionEventsStatus, SessionExportStatus, SessionFolderStatus,
-    SidecarService, SidecarStatus,
+    RecorderControlStatus, ScreenshotDeletionStatus, SessionEventsStatus, SessionExportStatus,
+    SessionFolderStatus, SessionScreenshotsStatus, SidecarService, SidecarStatus,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -127,6 +127,19 @@ fn export_commands_return_safe_unavailable_state_when_bridge_is_missing() {
         assert!(markdown.export.is_none());
         assert!(raw_json.export.is_none());
         assert!(folder.path.is_none());
+    });
+}
+
+#[test]
+fn screenshot_commands_return_safe_unavailable_state_when_bridge_is_missing() {
+    with_sidecar_env(None, None, None, None, || {
+        let screenshots = get_session_screenshots("sess_screenshot_001".to_string());
+        let deletion = delete_session_screenshots("sess_screenshot_001".to_string());
+
+        assert_eq!(screenshots.status, SessionScreenshotsStatus::Unavailable);
+        assert_eq!(deletion.status, ScreenshotDeletionStatus::Unavailable);
+        assert!(screenshots.screenshots.is_empty());
+        assert_eq!(deletion.deleted_rows, 0);
     });
 }
 
@@ -396,6 +409,69 @@ fn exports_load_preview_and_folder_from_local_sidecar() {
 }
 
 #[test]
+fn screenshots_load_metadata_and_delete_through_local_sidecar() {
+    let secret = ["password=", "mysecret"].concat();
+    let response_secret = secret.clone();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        let expected_paths = [
+            "GET /sessions/sess_screenshot_001/screenshots HTTP/1.1",
+            "DELETE /sessions/sess_screenshot_001/screenshots HTTP/1.1",
+        ];
+        let bodies = [
+            format!(
+                r#"{{"screenshots":[{{"id":"shot_001","session_id":"sess_screenshot_001","source_event_id":"evt_screen_001","timestamp":"2026-05-06T09:14:10+05:30","width":1920,"height":1080,"stored_width":960,"stored_height":540,"byte_size":12345,"content_hash":"{}","visual_hash":"visual_hash_001","storage_path":"screenshots/shot_001.png"}}]}}"#,
+                response_secret
+            ),
+            r#"{"deleted_files":1,"missing_files":0,"deleted_rows":1}"#.to_string(),
+        ];
+
+        for (expected_path, body) in expected_paths.iter().zip(bodies.iter()) {
+            let (mut stream, _) = listener.accept().expect("accept sidecar request");
+            let mut request = [0_u8; 2048];
+            let read_count = stream.read(&mut request).expect("read sidecar request");
+            let request_text = String::from_utf8_lossy(&request[..read_count]);
+            assert!(request_text.starts_with(expected_path));
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        }
+    });
+
+    let service = SidecarService;
+    let base_url = format!("http://127.0.0.1:{port}");
+    let screenshots =
+        service.session_screenshots_from_base_url("sess_screenshot_001".to_string(), &base_url);
+    let deletion = service
+        .delete_session_screenshots_from_base_url("sess_screenshot_001".to_string(), &base_url);
+    handle.join().expect("join local server");
+
+    assert_eq!(screenshots.status, SessionScreenshotsStatus::Available);
+    assert_eq!(screenshots.screenshots.len(), 1);
+    let screenshot = &screenshots.screenshots[0];
+    assert_eq!(screenshot.id, "shot_001");
+    assert_eq!(screenshot.session_id, "sess_screenshot_001");
+    assert_eq!(
+        screenshot.source_event_id.as_deref(),
+        Some("evt_screen_001")
+    );
+    assert_eq!(screenshot.stored_width, 960);
+    assert_eq!(screenshot.byte_size, 12345);
+    assert!(!screenshot.content_hash.contains(&secret));
+    assert_eq!(screenshot.content_hash, "[REDACTED]");
+    assert_eq!(deletion.status, ScreenshotDeletionStatus::Available);
+    assert_eq!(deletion.deleted_files, 1);
+    assert_eq!(deletion.deleted_rows, 1);
+}
+
+#[test]
 fn exports_reject_empty_session_ids_without_side_effects() {
     let service = SidecarService;
 
@@ -408,6 +484,22 @@ fn exports_reject_empty_session_ids_without_side_effects() {
     assert_eq!(markdown.status, SessionExportStatus::Unavailable);
     assert_eq!(raw_json.status, SessionExportStatus::Unavailable);
     assert_eq!(folder.status, SessionFolderStatus::Unavailable);
+}
+
+#[test]
+fn screenshots_reject_empty_session_ids_without_side_effects() {
+    let service = SidecarService;
+
+    let screenshots =
+        service.session_screenshots_from_base_url(" ".to_string(), "http://127.0.0.1:65534");
+    let deletion =
+        service.delete_session_screenshots_from_base_url("".to_string(), "http://127.0.0.1:65534");
+
+    assert_eq!(screenshots.status, SessionScreenshotsStatus::Unavailable);
+    assert_eq!(deletion.status, ScreenshotDeletionStatus::Unavailable);
+    assert!(screenshots.screenshots.is_empty());
+    assert_eq!(deletion.deleted_files, 0);
+    assert_eq!(deletion.deleted_rows, 0);
 }
 
 #[test]

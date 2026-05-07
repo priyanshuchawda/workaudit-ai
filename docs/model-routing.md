@@ -58,3 +58,14 @@ Default report model config:
 - Default temperature: 0.2.
 - Automatic downloads are disabled; this is manifest/config metadata only.
 - Gemma 4 E2B documents a 128K context window, but WorkTrace must not use that full window by default on the target 16 GB Windows laptop.
+
+Manual deep report model config:
+
+- Manual deep local report model: Gemma 4 E4B-it Q4.
+- Ollama-style model tag: `gemma4:e4b`.
+- Hugging Face model ID: `google/gemma-4-E4B-it`.
+- Deep mode is never the default and requires explicit user selection.
+- Deep mode is disabled during recording.
+- Deep mode falls back to E2B when memory pressure is high or E4B is unavailable.
+- Deep mode context budget is capped at 16384 tokens until a Windows benchmark proves more is safe.
+- Automatic downloads are disabled; this is manifest/config metadata only.

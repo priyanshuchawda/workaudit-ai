@@ -21,6 +21,9 @@ Selective OCR policy:
 - private or blocked apps skip OCR
 - likely secret-risk screens refuse OCR before extraction
 - OCR snippets must be redacted and linked to screenshot evidence IDs
+- optional real PaddleOCR adapter may run only after availability checks and explicit selective-worker scheduling
+- selective OCR enforces a per-session job cap to prevent continuous OCR behavior
+- OCR runtime failures must fail safely and skip the candidate without damaging session data
 
 Local report runtime policy:
 

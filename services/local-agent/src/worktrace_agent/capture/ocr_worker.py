@@ -25,6 +25,7 @@ HIGH_VALUE_MARKERS = (
     "pytest",
     "test",
 )
+DEFAULT_MAX_OCR_JOBS_PER_SESSION = 200
 
 
 class OcrSkipReason(StrEnum):
@@ -32,6 +33,8 @@ class OcrSkipReason(StrEnum):
     NOT_HIGH_VALUE = "not_high_value"
     PRIVACY_POLICY = "privacy_policy"
     SECRET_RISK = "secret_risk"
+    SESSION_LIMIT = "session_limit"
+    RUNTIME_FAILED = "runtime_failed"
 
 
 @dataclass(frozen=True)
@@ -77,9 +80,18 @@ class OcrDecision:
 
 
 class SelectiveOcrWorker:
-    def __init__(self, *, privacy_policy: PrivacyPolicy | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        privacy_policy: PrivacyPolicy | None = None,
+        max_jobs_per_session: int = DEFAULT_MAX_OCR_JOBS_PER_SESSION,
+    ) -> None:
         self._privacy_policy = privacy_policy or PrivacyPolicy()
+        if max_jobs_per_session <= 0:
+            raise ValueError("max_jobs_per_session must be greater than zero")
+        self._max_jobs_per_session = max_jobs_per_session
         self._last_visual_hash_by_session: dict[str, str] = {}
+        self._processed_jobs_by_session: dict[str, int] = {}
 
     def process_candidate(self, candidate: OcrCandidate, *, engine: OcrEngine) -> OcrDecision:
         validate_ocr_candidate(candidate)
@@ -93,11 +105,18 @@ class SelectiveOcrWorker:
         previous_hash = self._last_visual_hash_by_session.get(candidate.screenshot.session_id)
         if previous_hash == candidate.screenshot.visual_hash:
             return OcrDecision(result=None, skipped=OcrSkipReason.UNCHANGED)
+        processed_jobs = self._processed_jobs_by_session.get(candidate.screenshot.session_id, 0)
+        if processed_jobs >= self._max_jobs_per_session:
+            return OcrDecision(result=None, skipped=OcrSkipReason.SESSION_LIMIT)
 
         self._last_visual_hash_by_session[candidate.screenshot.session_id] = (
             candidate.screenshot.visual_hash
         )
-        engine_result = engine.recognize(candidate)
+        try:
+            engine_result = engine.recognize(candidate)
+        except Exception:
+            return OcrDecision(result=None, skipped=OcrSkipReason.RUNTIME_FAILED)
+        self._processed_jobs_by_session[candidate.screenshot.session_id] = processed_jobs + 1
         return OcrDecision(
             result=build_ocr_result(
                 candidate=candidate,

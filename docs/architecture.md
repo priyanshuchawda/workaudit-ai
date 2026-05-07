@@ -46,7 +46,7 @@ Implemented today:
 - privacy redaction and private-mode suppression across implemented capture workers
 - deterministic timeline, Markdown export, and report foundations
 - local model availability fallback states
-- selective OCR/audio/embedding/vision contracts without real model loading
+- selective OCR guardrails and OCR/audio/embedding/vision contracts without bundled model loading
 - workflow debugger rules, golden evals, and resource budget checks
 
 Not implemented yet:
@@ -56,5 +56,5 @@ Not implemented yet:
 - desktop privacy center and configurable blocklist UI
 - production signing or updater
 - real model runtime downloads
-- live OCR/model runtime integrations
+- bundled OCR/model runtime integrations
 - real Windows performance benchmark

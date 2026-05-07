@@ -34,7 +34,9 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "explicit safe terminal command ingestion" in readme
     assert "hardened privacy redaction/private-mode suppression" in readme
     assert "desktop privacy center, configurable blocklist UI" in readme
-    assert "OCR and model runtimes are still not live" in readme
+    assert "selective OCR runtime guardrails" in readme
+    assert "PaddleOCR is not bundled, downloaded, or required" in readme
+    assert "no real OCR smoke has been run" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "deterministic Markdown/raw JSON export review" in readme
     assert "AI report panel is intentionally unavailable" in readme

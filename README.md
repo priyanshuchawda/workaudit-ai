@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with compressed PNG artifact storage and retention cleanup, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, and hardened privacy redaction/private-mode suppression for implemented capture workers. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with compressed PNG artifact storage and retention cleanup, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, hardened privacy redaction/private-mode suppression for implemented capture workers, and selective OCR runtime guardrails with optional runtime availability checks. It does not yet include terminal spying/global shell capture, continuous OCR, bundled PaddleOCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -26,13 +26,13 @@ MVP 1B now includes a persisted Python session state machine for recording, paus
 
 MVP 1B now includes deterministic fake active-window raw events, SQLite raw-event read/write helpers, and a raw timeline UI preview. This is not live OS capture yet.
 
-MVP 1B now includes real Windows active-window polling in the Python sidecar, with a provider abstraction, change-only raw-event persistence, session start/stop API wiring, and safe provider failure handling. This records app/process/window-title changes only; screenshots, file watcher, terminal capture, OCR, and model runtimes are still not live.
+MVP 1B now includes real Windows active-window polling in the Python sidecar, with a provider abstraction, change-only raw-event persistence, session start/stop API wiring, and safe provider failure handling. This records app/process/window-title changes only; screenshots, file watcher, terminal capture, OCR, and model runtimes are handled by later guarded layers.
 
 MVP 1B now includes Tauri commands that can start, pause, resume, stop, and load events from a configured localhost Python sidecar bridge and otherwise return safe unavailable states so the desktop can fall back to fixture preview data.
 
 MVP 1B now includes a Tauri sidecar launch abstraction for a configured local sidecar binary and localhost port. It starts the process with local-only sidecar host/port environment, suppresses sidecar stdio, stops the managed process safely, and still returns safe missing/unhealthy states when no configured binary is available. Packaging-ready sidecar binary lookup exists, Tauri is configured for a `worktrace-local-agent` external binary, and the Python sidecar has a local-only executable entrypoint. A local Windows package smoke has produced a PyInstaller sidecar artifact and NSIS installer with the sidecar artifact present. Python sidecar packaging is not bundled into the installer unless the target-triple sidecar artifact is produced before the Windows package build.
 
-MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width compressed PNG artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, bounded retention cleanup, and safe screenshot deletion under the session artifact root. JPEG/WebP screenshot encoding and OCR are not implemented yet.
+MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width compressed PNG artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, bounded retention cleanup, and safe screenshot deletion under the session artifact root. JPEG/WebP screenshot encoding is not implemented yet.
 
 MVP 1C now includes a metadata-only file watcher worker for configured folders. It polls filesystem snapshots, emits created/modified/deleted/renamed raw events, ignores noisy build/dependency folders, marks sensitive file paths, and does not store file contents.
 
@@ -52,7 +52,7 @@ MVP 1F now includes typed local model availability and fallback states so determ
 
 MVP 1F now includes an evidence-cited local LLM report generation foundation with prompt construction, Pydantic output validation, invalid JSON retry, and hallucination guards. This uses a local model client contract only; no real model runtime, model download, or report UI is implemented yet.
 
-MVP 2A now includes a selective OCR worker foundation that processes changed high-value screenshot candidates, redacts OCR text, and stores OCR results with screenshot evidence links. This uses a fakeable OCR engine contract only; live PaddleOCR integration is not implemented yet.
+MVP 2A now includes a selective OCR worker/runtime foundation that processes changed high-value screenshot candidates, skips private or blocked apps, refuses likely secret-risk screens, redacts OCR text, stores OCR results with screenshot evidence links, and reports optional OCR runtime availability without importing heavy OCR packages. This uses a fakeable OCR engine contract; PaddleOCR is not bundled, downloaded, or required.
 
 MVP 2A now includes optional audio transcription and command embedding foundations with fakeable engine/model contracts. Audio transcription is disabled by default, command clusters keep evidence event IDs, and no real audio capture, model download, or embedding runtime is implemented yet.
 
@@ -84,12 +84,13 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 
 ## Current Limitations
 
-- Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL or configured local sidecar binary/port; OCR and model runtimes are still not live.
+- Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, selective OCR guardrails, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL or configured local sidecar binary/port; PaddleOCR and model runtimes are not bundled or downloaded.
 - Screenshot artifacts are currently stored as compressed PNG files with conservative retention cleanup. JPEG/WebP encoding decisions are documented as deferred until a dedicated image-encoding/runtime issue.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
 - The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, screenshot metadata/delete UI, and a session browser with session deletion. Session folder-open shows the local path only; no shell open is wired yet.
 - The desktop AI report panel is intentionally unavailable. Real local LLM runtime integration and model downloads are not implemented.
+- Selective OCR remains backend/runtime-contract work. The desktop screenshot panel does not yet show stored OCR snippets, and no real OCR smoke has been run in this PR.
 - Python sidecar packaging is not bundled into the installer unless `pnpm --dir apps/desktop package:sidecar` first produces the expected target-triple sidecar executable for Tauri. The Windows installer build smoke has passed locally with that artifact present, but installer install/run QA has not been performed.
 - Local model runtimes and model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.

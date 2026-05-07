@@ -47,6 +47,8 @@ logs/
 
 # Models/artifacts
 models/
+!docs/models/
+!docs/models/*.md
 *.onnx
 *.pt
 *.pth

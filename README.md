@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a first real Windows active-window polling loop, real Windows screenshot capture with artifact storage, metadata-only file watcher capture for configured folders, and explicit safe terminal command ingestion in the Python sidecar. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a first real Windows active-window polling loop, real Windows screenshot capture with artifact storage, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, and hardened privacy redaction/private-mode suppression for implemented capture workers. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -36,7 +36,7 @@ MVP 1C now includes a metadata-only file watcher worker for configured folders. 
 
 MVP 1C now includes explicit safe terminal command ingestion through the local API. It accepts command, shell, exit code, timestamp, and session ID from a manual/logger path, redacts secrets before persistence, stores a redacted command hash, and exposes terminal events in the raw timeline stream. This is not terminal spying, keylogging, or global shell capture.
 
-MVP 1D now includes foundational privacy policy decisions, prompt/export/log redaction helpers, and screenshot deletion that removes SQLite references and files under a session artifact root. This is not a complete privacy system yet.
+MVP 1D now includes foundational privacy policy decisions, prompt/export/log redaction helpers, stronger JWT/GitHub/Google/AWS/private-key/password-style redaction, optional generic email/phone redaction controls, private-mode suppression for active-window/screenshot/file-watcher workers, and screenshot deletion that removes SQLite references and files under a session artifact root. This is not a complete privacy center or desktop blocklist configuration UI yet.
 
 MVP 1D now includes crash recovery helpers that mark active sessions as interrupted, keep partial raw events readable, and show an initial interrupted-session banner preview. This is not live crash monitoring yet.
 
@@ -80,6 +80,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 
 - Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL; OCR and model runtimes are still not live.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
+- Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
 - The desktop app now has a session dashboard foundation and sidecar-backed recorder controls, but desktop export commands, desktop screenshot metadata commands, and packaged sidecar launch are not fully wired yet.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.

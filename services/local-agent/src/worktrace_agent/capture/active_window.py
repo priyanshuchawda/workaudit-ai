@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from worktrace_agent.db.raw_events_repository import append_raw_event, append_raw_events
 from worktrace_agent.domain.raw_event import RawEvent, build_raw_event
+from worktrace_agent.privacy.policy import PrivacyPolicy
 from worktrace_agent.privacy.redaction import REDACTION_TOKEN, redact_text
 
 ACTIVE_WINDOW_SOURCE = "active_window"
@@ -69,11 +70,13 @@ class ActiveWindowRecorder:
         connection: sqlite3.Connection,
         session_id: str,
         provider: ActiveWindowProvider,
+        privacy_policy: PrivacyPolicy | None = None,
         poll_interval_seconds: float = 1,
     ) -> None:
         self._connection = connection
         self._session_id = session_id
         self._provider = provider
+        self._privacy_policy = privacy_policy or PrivacyPolicy()
         self._poll_interval_seconds = poll_interval_seconds
         self._last_identity: tuple[str, str, str] | None = None
         self._stop_event = asyncio.Event()
@@ -87,6 +90,14 @@ class ActiveWindowRecorder:
             return None
 
         if snapshot is None:
+            return None
+
+        if not self._privacy_policy.should_capture_source(ACTIVE_WINDOW_SOURCE):
+            return None
+        if not self._privacy_policy.should_capture_app_identity(
+            app_name=snapshot.app,
+            process_name=snapshot.process_name,
+        ):
             return None
 
         event = self._event_from_snapshot(snapshot)

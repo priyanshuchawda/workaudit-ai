@@ -56,6 +56,51 @@ def test_privacy_leak_count_is_zero_for_prompt_export_and_log_surfaces() -> None
     assert count_privacy_leaks(redacted_log) == 0
 
 
+def test_hardened_redaction_removes_common_secret_formats_and_optional_contact_info() -> None:
+    jwt_token = (
+        "eyJ" + "hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+        "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    )
+    github_pat = "github" + "_pat_" + "11AAAAAAA0abcdefghijklmnopqrstuvwxyzABCDEFGHIJK"
+    github_oauth = "gh" + "o_" + "abcdefghijklmnopqrstuvwxyz1234567890"
+    google_key = "AI" + "za" + "SyDq4mFakeGoogleApiKeyValueForTests1234"
+    aws_access_key = "AK" + "IA" + "IOSFODNN7EXAMPLE"
+    aws_secret_value = "wJ" + "alrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    private_key = (
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----"
+    )
+    payload = {
+        "jwt": jwt_token,
+        "github": github_pat,
+        "github_oauth": github_oauth,
+        "google": google_key,
+        "aws_access_key": aws_access_key,
+        "aws_secret": f"AWS_SECRET_ACCESS_KEY={aws_secret_value}",
+        "private_key": private_key,
+        "contact": "alice@example.org",
+        "phone": "+1 415 555 2671",
+    }
+
+    redacted_without_contacts = redact_for_export(payload)
+    redacted_with_contacts = redact_for_export(payload, redact_contact_info=True)
+    serialized_without_contacts = str(redacted_without_contacts)
+    serialized_with_contacts = str(redacted_with_contacts)
+
+    assert jwt_token.split(".")[0] not in serialized_without_contacts
+    assert github_pat not in serialized_without_contacts
+    assert github_oauth not in serialized_without_contacts
+    assert google_key not in serialized_without_contacts
+    assert aws_access_key not in serialized_without_contacts
+    assert aws_secret_value not in serialized_without_contacts
+    assert private_key not in serialized_without_contacts
+    assert "alice@example.org" in serialized_without_contacts
+    assert "+1 415 555 2671" in serialized_without_contacts
+    assert count_privacy_leaks(redacted_without_contacts) == 0
+    assert "alice@example.org" not in serialized_with_contacts
+    assert "+1 415 555 2671" not in serialized_with_contacts
+
+
 def test_privacy_policy_supports_allowlist_blocklist_private_and_clipboard_safe_mode() -> None:
     policy = PrivacyPolicy(
         allowlist=("Code.exe",),

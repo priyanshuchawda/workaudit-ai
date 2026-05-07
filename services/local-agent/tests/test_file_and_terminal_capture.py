@@ -110,6 +110,59 @@ def test_terminal_command_is_redacted_before_storage_and_export(tmp_path: Path) 
         connection.close()
 
 
+def test_terminal_command_redacts_common_secret_formats_before_database_and_export(
+    tmp_path: Path,
+) -> None:
+    github_pat = "github" + "_pat_" + "11AAAAAAA0abcdefghijklmnopqrstuvwxyzABCDEFGHIJK"
+    google_key = "AI" + "za" + "SyDq4mFakeGoogleApiKeyValueForTests1234"
+    aws_access_key = "AK" + "IA" + "IOSFODNN7EXAMPLE"
+    aws_secret_value = "wJ" + "alrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    jwt_token = (
+        "eyJ" + "hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+        "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    )
+    raw_command = (
+        f"deploy --token {github_pat} "
+        f"--api-key {google_key} "
+        f"AWS_ACCESS_KEY_ID={aws_access_key} "
+        f"AWS_SECRET_ACCESS_KEY={aws_secret_value} "
+        f"Authorization: Bearer {jwt_token}"
+    )
+    event = normalize_terminal_command(
+        session_id=SESSION_ID,
+        timestamp=TIMESTAMP,
+        command=raw_command,
+        shell="powershell",
+        exit_code=1,
+    )
+    connection = initialize_database(tmp_path / "worktrace.sqlite")
+    export_path = tmp_path / "exports" / "session.raw.json"
+    try:
+        start_session(connection, session_id=SESSION_ID, started_at=TIMESTAMP)
+        append_raw_event(connection, event)
+
+        stored_metadata = connection.execute(
+            "SELECT metadata_json FROM raw_events WHERE id = ?",
+            (event.id,),
+        ).fetchone()["metadata_json"]
+        exported_text = export_redacted_raw_json(connection, SESSION_ID, export_path).read_text(
+            encoding="utf-8"
+        )
+
+        for leaked_fragment in (
+            github_pat,
+            google_key,
+            aws_access_key,
+            aws_secret_value,
+            jwt_token,
+        ):
+            assert leaked_fragment not in stored_metadata
+            assert leaked_fragment not in exported_text
+    finally:
+        connection.close()
+
+
 def test_safe_terminal_command_keeps_command_text() -> None:
     event = normalize_terminal_command(
         session_id=SESSION_ID,

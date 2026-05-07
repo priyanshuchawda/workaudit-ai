@@ -38,6 +38,7 @@ from worktrace_agent.db.session_state_repository import (
 )
 from worktrace_agent.domain.raw_event import RawEvent
 from worktrace_agent.domain.session_state import SessionRecord
+from worktrace_agent.privacy.policy import PrivacyPolicy
 
 
 @dataclass
@@ -202,11 +203,13 @@ class SessionRecorderService:
         file_watch_roots: list[str] | None,
     ) -> None:
         session_id = session.id
+        privacy_policy = self._privacy_policy_for_session(session)
         if session_id not in self._running_recorders:
             recorder = ActiveWindowRecorder(
                 connection=self._connection,
                 session_id=session_id,
                 provider=self._active_window_provider,
+                privacy_policy=privacy_policy,
                 poll_interval_seconds=self._recorder_poll_interval_seconds,
             )
             recorder.poll_once()
@@ -221,6 +224,7 @@ class SessionRecorderService:
                 artifact_root=self._artifact_root_for_session(session),
                 provider=self._screenshot_provider,
                 sampler=self._screenshot_samplers.setdefault(session_id, ScreenshotSampler()),
+                privacy_policy=privacy_policy,
                 interval_seconds=self._screenshot_interval_seconds,
             )
             active_process_name = self._active_process_name()
@@ -240,6 +244,7 @@ class SessionRecorderService:
                 session_id=session_id,
                 roots=roots,
                 provider=self._file_snapshot_provider,
+                privacy_policy=privacy_policy,
                 interval_seconds=self._file_watch_interval_seconds,
             )
             file_watcher.poll_once()
@@ -266,6 +271,9 @@ class SessionRecorderService:
             await running.recorder.stop()
             with contextlib.suppress(asyncio.CancelledError):
                 await running.task
+
+    def _privacy_policy_for_session(self, session: SessionRecord) -> PrivacyPolicy:
+        return PrivacyPolicy(private_mode=session.privacy_mode == "private")
 
     def _artifact_root_for_session(self, session: SessionRecord) -> Path:
         if session.storage_path:

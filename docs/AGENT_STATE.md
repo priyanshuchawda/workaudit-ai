@@ -1,13 +1,13 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 22:50 local / 2026-05-07 17:20 UTC
+2026-05-07 23:00 local / 2026-05-07 17:30 UTC
 
 ## Current Issue
-#87 — Gemma E2B local default config
+#89 — Real model download manager
 
 ## Current Branch
-feat/87-gemma-e2b-default-config
+feat/89-real-model-download-manager
 
 ## Current Phase
 Diff review before PR
@@ -78,16 +78,28 @@ Diff review before PR
 - Self-review found that explicit `context_budget_tokens=0` would fall back to the default in the Gemma config builder.
 - Added a red regression test for zero context budget and fixed the builder to validate it explicitly.
 - Reran the focused #87 tests and full quality gate successfully after the zero-budget fix.
+- Staged, committed, pushed, opened PR #88 for #87, confirmed the available GitGuardian check was green, merged PR #88 into `main`, and confirmed issue #87 is closed.
+- Created #89: Real model download manager.
+- Started branch `feat/89-real-model-download-manager` from updated `main`.
+- Refreshed the mandated repo/GitHub checks for #89.
+- Re-read the required project docs and model download/runtime policy docs for #89.
+- Wrote the #89 implementation plan at `docs/superpowers/plans/2026-05-07-real-model-download-manager.md`.
+- Added red tests for `verifying` cache state, model source/manual spec fields, source URL credential rejection, insufficient disk, checksum mismatch preserving an existing cached model, successful local-file install, exact-file uninstall, gitignore artifact protections, and no heavy imports.
+- Implemented manual local-file model install with disk-space checks, temp-file copy, expected-size/checksum verification, and atomic replace.
+- Implemented exact cached model file uninstall without recursive directory deletion.
+- Added `.gitignore` model artifact protections for `.bin`, `.tflite`, and `.task`.
+- Updated README and model policy docs for the manual install/uninstall behavior and no-network/no-runtime limitations.
+- Ran the focused #89 tests and full quality gate successfully after fixing one Ruff line-length issue.
 
 ## Current Local Changes
-- `README.md`
 - `docs/AGENT_STATE.md`
-- `docs/model-routing.md`
-- `docs/models/gemma.md`
+- `.gitignore`
+- `README.md`
+- `docs/models/model_download_policy.md`
 - `docs/models/local_model_runtime.md`
-- `docs/superpowers/plans/2026-05-07-gemma-e2b-default-config.md`
-- `services/local-agent/src/worktrace_agent/ai/gemma_manifest.py`
-- `services/local-agent/tests/test_gemma_model_manifest.py`
+- `docs/superpowers/plans/2026-05-07-real-model-download-manager.md`
+- `services/local-agent/src/worktrace_agent/ai/model_cache.py`
+- `services/local-agent/tests/test_model_cache.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -216,17 +228,33 @@ Diff review before PR
 - `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed after the zero-budget fix.
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed after the zero-budget fix.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests after the zero-budget fix.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_model_cache.py -q` — failed as expected because `install_model_from_local_file` and `uninstall_model` were not implemented yet.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_model_cache.py -q` — passed, 15 tests after manual install/uninstall implementation.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_model_cache.py tests/test_gemma_model_manifest.py tests/test_model_availability.py tests/test_portfolio_claim_discipline.py -q` — passed, 38 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed after reformatting 2 files.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — failed once on one long line in `model_cache.py`, then passed after formatting.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 206 tests.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed, 14 tests.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop test` — passed, 28 tests.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #87 does not change sidecar packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #87 does not change installer packaging.
-- Real Ollama/Gemma/Qwen smoke — not run; #87 is a metadata-only default config and does not download/start a runtime.
+- `pnpm --dir apps/desktop package:sidecar` — not run; #89 does not change sidecar packaging.
+- `pnpm --dir apps/desktop package:windows` — not run; #89 does not change installer packaging.
+- Real network model download smoke — not run; #89 intentionally implements only manual local-file install/uninstall, not a network downloader.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run final diff/whitespace checks, stage scoped #87 files, commit, push, and open PR.
+Run final diff/whitespace checks, stage scoped #89 files, commit, push, and open PR.
 
 ## Do Not Forget
 - No OCR before OCR issue.

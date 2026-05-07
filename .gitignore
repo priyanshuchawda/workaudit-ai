@@ -50,10 +50,13 @@ models/
 !docs/models/
 !docs/models/*.md
 *.onnx
+*.bin
 *.pt
 *.pth
 *.safetensors
 *.gguf
+*.tflite
+*.task
 
 # Temporary
 tmp/

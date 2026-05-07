@@ -1,5 +1,6 @@
 use crate::services::sidecar::{
-    RecorderControlResult, SessionEventsResult, SidecarHealth, SidecarService,
+    RecorderControlResult, SessionEventsResult, SessionExportResult, SessionFolderResult,
+    SidecarHealth, SidecarService,
 };
 
 #[tauri::command]
@@ -45,4 +46,19 @@ pub fn resume_recording_session(session_id: String, resumed_at: String) -> Recor
 #[tauri::command]
 pub fn stop_recording_session(session_id: String, stopped_at: String) -> RecorderControlResult {
     SidecarService.stop_recording_session(session_id, stopped_at)
+}
+
+#[tauri::command]
+pub fn export_session_markdown(session_id: String) -> SessionExportResult {
+    SidecarService.export_session_markdown(session_id)
+}
+
+#[tauri::command]
+pub fn export_session_raw_json(session_id: String) -> SessionExportResult {
+    SidecarService.export_session_raw_json(session_id)
+}
+
+#[tauri::command]
+pub fn get_session_folder(session_id: String) -> SessionFolderResult {
+    SidecarService.session_folder(session_id)
 }

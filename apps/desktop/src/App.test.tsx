@@ -2,7 +2,10 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
+  exportSessionMarkdown,
+  exportSessionRawJson,
   getSessionEvents,
+  getSessionFolder,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -11,12 +14,17 @@ import {
   stopRecordingSession,
   stopSidecar,
   type RecorderControlResult,
+  type SessionExportResult,
   type SessionEventsResult,
+  type SessionFolderResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
 vi.mock("./lib/tauri-client", () => ({
+  exportSessionMarkdown: vi.fn(),
+  exportSessionRawJson: vi.fn(),
   getSessionEvents: vi.fn(),
+  getSessionFolder: vi.fn(),
   getSidecarHealth: vi.fn(),
   pauseRecordingSession: vi.fn(),
   resumeRecordingSession: vi.fn(),
@@ -49,6 +57,9 @@ const healthySidecar: SidecarHealth = {
 
 const getSidecarHealthMock = vi.mocked(getSidecarHealth);
 const getSessionEventsMock = vi.mocked(getSessionEvents);
+const exportSessionMarkdownMock = vi.mocked(exportSessionMarkdown);
+const exportSessionRawJsonMock = vi.mocked(exportSessionRawJson);
+const getSessionFolderMock = vi.mocked(getSessionFolder);
 const startRecordingSessionMock = vi.mocked(startRecordingSession);
 const pauseRecordingSessionMock = vi.mocked(pauseRecordingSession);
 const resumeRecordingSessionMock = vi.mocked(resumeRecordingSession);
@@ -89,9 +100,56 @@ const stoppedControl: RecorderControlResult = {
   },
 };
 
+const markdownExport: SessionExportResult = {
+  status: "available",
+  message: "Markdown export generated.",
+  export: {
+    format: "markdown",
+    path: "C:/WorkTrace/sessions/sess_live_001/exports/session.md",
+    preview:
+      "# WorkTrace Session Export\n\nDeterministic export generated from local session evidence. No LLM was used.\n\nEvidence: evt_live_001",
+    evidenceIds: ["evt_live_001"],
+  },
+};
+
+const rawJsonExport: SessionExportResult = {
+  status: "available",
+  message: "Raw JSON export generated.",
+  export: {
+    format: "raw_json",
+    path: "C:/WorkTrace/sessions/sess_live_001/exports/session.raw.json",
+    preview: '{\n  "events": [\n    { "id": "evt_live_001" }\n  ]\n}',
+    evidenceIds: ["evt_live_001"],
+  },
+};
+
+const folderResult: SessionFolderResult = {
+  status: "available",
+  message: "Session folder is available.",
+  path: "C:/WorkTrace/sessions/sess_live_001",
+};
+
 beforeEach(() => {
   getSessionEventsMock.mockReset();
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
+  exportSessionMarkdownMock.mockReset();
+  exportSessionMarkdownMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session export bridge is unavailable.",
+    export: null,
+  });
+  exportSessionRawJsonMock.mockReset();
+  exportSessionRawJsonMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session export bridge is unavailable.",
+    export: null,
+  });
+  getSessionFolderMock.mockReset();
+  getSessionFolderMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session folder bridge is unavailable.",
+    path: null,
+  });
   getSidecarHealthMock.mockReset();
   startRecordingSessionMock.mockReset();
   startRecordingSessionMock.mockResolvedValue({
@@ -292,13 +350,87 @@ test("renders session dashboard surfaces with honest unavailable actions", async
   expect(await screen.findByRole("region", { name: "Sessions" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Session detail" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Screenshot evidence" })).toBeInTheDocument();
-  expect(screen.getByRole("region", { name: "Export and retention" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Export and report review" })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Privacy status" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Delete screenshots" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Export Markdown" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Export raw JSON" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Delete session" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Open session folder" })).toBeDisabled();
   expect(screen.getByText("Screenshot metadata bridge unavailable")).toBeInTheDocument();
+  expect(screen.getByText("AI report unavailable")).toBeInTheDocument();
+});
+
+test("exports markdown and raw JSON previews for a live sidecar session", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  exportSessionMarkdownMock.mockResolvedValue(markdownExport);
+  exportSessionRawJsonMock.mockResolvedValue(rawJsonExport);
+  getSessionFolderMock.mockResolvedValue(folderResult);
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+  fireEvent.click(within(exportPanel).getByRole("button", { name: "Export Markdown" }));
+
+  expect(exportSessionMarkdownMock).toHaveBeenCalledWith("latest");
+  expect(await within(exportPanel).findByText("Markdown export generated.")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("evt_live_001")).toBeInTheDocument();
+  expect(
+    within(exportPanel).getByText(/Deterministic export generated from local session evidence/),
+  ).toBeInTheDocument();
+
+  fireEvent.click(within(exportPanel).getByRole("button", { name: "Export raw JSON" }));
+  expect(exportSessionRawJsonMock).toHaveBeenCalledWith("latest");
+  expect(await within(exportPanel).findByText("Raw JSON export generated.")).toBeInTheDocument();
+  expect(within(exportPanel).getByText(/"events"/)).toBeInTheDocument();
+
+  fireEvent.click(within(exportPanel).getByRole("button", { name: "Open session folder" }));
+  expect(getSessionFolderMock).toHaveBeenCalledWith("latest");
+  expect(await within(exportPanel).findByText("Session folder is available.")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("C:/WorkTrace/sessions/sess_live_001")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("AI report unavailable")).toBeInTheDocument();
+});
+
+test("shows safe export error state when the sidecar export bridge is unavailable", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  exportSessionMarkdownMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session export bridge is unavailable.",
+    export: null,
+  });
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+  fireEvent.click(within(exportPanel).getByRole("button", { name: "Export Markdown" }));
+
+  expect(await within(exportPanel).findByText("Session export bridge is unavailable.")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("No export preview available yet.")).toBeInTheDocument();
 });
 
 test("starts pauses resumes and stops a recorder session from the desktop controls", async () => {

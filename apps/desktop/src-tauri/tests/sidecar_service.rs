@@ -7,11 +7,13 @@ use std::{
     thread,
 };
 use worktrace_desktop_lib::commands::sidecar::{
-    get_session_events, pause_recording_session, resume_recording_session, start_recording_session,
+    export_session_markdown, export_session_raw_json, get_session_events, get_session_folder,
+    pause_recording_session, resume_recording_session, start_recording_session,
     stop_recording_session,
 };
 use worktrace_desktop_lib::services::sidecar::{
-    RecorderControlStatus, SessionEventsStatus, SidecarService, SidecarStatus,
+    RecorderControlStatus, SessionEventsStatus, SessionExportStatus, SessionFolderStatus,
+    SidecarService, SidecarStatus,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -109,6 +111,22 @@ fn recorder_control_commands_return_safe_unavailable_state_when_bridge_is_missin
         assert_eq!(resume.status, RecorderControlStatus::Unavailable);
         assert_eq!(stop.status, RecorderControlStatus::Unavailable);
         assert!(start.session.is_none());
+    });
+}
+
+#[test]
+fn export_commands_return_safe_unavailable_state_when_bridge_is_missing() {
+    with_sidecar_env(None, None, None, None, || {
+        let markdown = export_session_markdown("sess_export_001".to_string());
+        let raw_json = export_session_raw_json("sess_export_001".to_string());
+        let folder = get_session_folder("sess_export_001".to_string());
+
+        assert_eq!(markdown.status, SessionExportStatus::Unavailable);
+        assert_eq!(raw_json.status, SessionExportStatus::Unavailable);
+        assert_eq!(folder.status, SessionFolderStatus::Unavailable);
+        assert!(markdown.export.is_none());
+        assert!(raw_json.export.is_none());
+        assert!(folder.path.is_none());
     });
 }
 
@@ -310,6 +328,86 @@ fn recorder_controls_post_to_local_sidecar_and_return_session_state() {
         stop.session.as_ref().expect("stop session").status,
         "stopped"
     );
+}
+
+#[test]
+fn exports_load_preview_and_folder_from_local_sidecar() {
+    let secret = ["password=", "mysecret"].concat();
+    let response_secret = secret.clone();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        let expected_paths = [
+            "POST /sessions/sess_export_001/exports/markdown HTTP/1.1",
+            "POST /sessions/sess_export_001/exports/raw-json HTTP/1.1",
+            "GET /sessions/sess_export_001/folder HTTP/1.1",
+        ];
+        let bodies = [
+            format!(
+                r##"{{"format":"markdown","path":"C:/WorkTrace/sessions/sess_export_001/exports/session.md","preview":"# WorkTrace Session Export\nEvidence: evt_export_001\n{}","evidence_ids":["evt_export_001"]}}"##,
+                response_secret
+            ),
+            r#"{"format":"raw_json","path":"C:/WorkTrace/sessions/sess_export_001/exports/session.raw.json","preview":"{\"events\":[{\"id\":\"evt_export_001\"}]}","evidence_ids":["evt_export_001"]}"#.to_string(),
+            r#"{"path":"C:/WorkTrace/sessions/sess_export_001"}"#.to_string(),
+        ];
+
+        for (expected_path, body) in expected_paths.iter().zip(bodies.iter()) {
+            let (mut stream, _) = listener.accept().expect("accept sidecar request");
+            let mut request = [0_u8; 2048];
+            let read_count = stream.read(&mut request).expect("read sidecar request");
+            let request_text = String::from_utf8_lossy(&request[..read_count]);
+            assert!(request_text.starts_with(expected_path));
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        }
+    });
+
+    let service = SidecarService;
+    let base_url = format!("http://127.0.0.1:{port}");
+    let markdown =
+        service.export_session_markdown_from_base_url("sess_export_001".to_string(), &base_url);
+    let raw_json =
+        service.export_session_raw_json_from_base_url("sess_export_001".to_string(), &base_url);
+    let folder = service.session_folder_from_base_url("sess_export_001".to_string(), &base_url);
+    handle.join().expect("join local server");
+
+    assert_eq!(markdown.status, SessionExportStatus::Available);
+    assert_eq!(raw_json.status, SessionExportStatus::Available);
+    assert_eq!(folder.status, SessionFolderStatus::Available);
+    let markdown_export = markdown.export.expect("markdown export");
+    assert_eq!(markdown_export.format, "markdown");
+    assert!(markdown_export.preview.contains("evt_export_001"));
+    assert!(!markdown_export.preview.contains(&secret));
+    assert_eq!(markdown_export.evidence_ids, vec!["evt_export_001"]);
+    let raw_json_export = raw_json.export.expect("raw json export");
+    assert_eq!(raw_json_export.format, "raw_json");
+    assert!(raw_json_export.preview.contains("evt_export_001"));
+    assert_eq!(
+        folder.path.as_deref(),
+        Some("C:/WorkTrace/sessions/sess_export_001")
+    );
+}
+
+#[test]
+fn exports_reject_empty_session_ids_without_side_effects() {
+    let service = SidecarService;
+
+    let markdown =
+        service.export_session_markdown_from_base_url(" ".to_string(), "http://127.0.0.1:65534");
+    let raw_json =
+        service.export_session_raw_json_from_base_url("".to_string(), "http://127.0.0.1:65534");
+    let folder = service.session_folder_from_base_url(" ".to_string(), "http://127.0.0.1:65534");
+
+    assert_eq!(markdown.status, SessionExportStatus::Unavailable);
+    assert_eq!(raw_json.status, SessionExportStatus::Unavailable);
+    assert_eq!(folder.status, SessionFolderStatus::Unavailable);
 }
 
 #[test]

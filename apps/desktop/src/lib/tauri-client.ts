@@ -60,6 +60,21 @@ export type StopRecordingSessionInput = {
   stoppedAt: string;
 };
 
+export type SessionExportPreview = {
+  format: "markdown" | "raw_json" | string;
+  path: string;
+  preview: string;
+  evidenceIds: string[];
+};
+
+export type SessionExportResult =
+  | { status: "available"; message: string; export: SessionExportPreview }
+  | { status: "unavailable"; message: string; export: null };
+
+export type SessionFolderResult =
+  | { status: "available"; message: string; path: string }
+  | { status: "unavailable"; message: string; path: null };
+
 const SIDE_CAR_COMMANDS = {
   health: "get_sidecar_health",
   start: "start_sidecar",
@@ -69,6 +84,9 @@ const SIDE_CAR_COMMANDS = {
   pauseRecordingSession: "pause_recording_session",
   resumeRecordingSession: "resume_recording_session",
   stopRecordingSession: "stop_recording_session",
+  exportSessionMarkdown: "export_session_markdown",
+  exportSessionRawJson: "export_session_raw_json",
+  sessionFolder: "get_session_folder",
 } as const;
 
 const UNHEALTHY_FALLBACK: SidecarHealth = {
@@ -82,6 +100,18 @@ const RECORDER_CONTROL_FALLBACK: RecorderControlResult = {
   status: "unavailable",
   message: "Recorder sidecar bridge is unavailable.",
   session: null,
+};
+
+const SESSION_EXPORT_FALLBACK: SessionExportResult = {
+  status: "unavailable",
+  message: "Session export bridge is unavailable.",
+  export: null,
+};
+
+const SESSION_FOLDER_FALLBACK: SessionFolderResult = {
+  status: "unavailable",
+  message: "Session folder bridge is unavailable.",
+  path: null,
 };
 
 export async function getSidecarHealth(): Promise<SidecarHealth> {
@@ -141,6 +171,34 @@ export async function stopRecordingSession(
     return await invoke<RecorderControlResult>(SIDE_CAR_COMMANDS.stopRecordingSession, input);
   } catch {
     return RECORDER_CONTROL_FALLBACK;
+  }
+}
+
+export async function exportSessionMarkdown(sessionId: string): Promise<SessionExportResult> {
+  try {
+    return await invoke<SessionExportResult>(SIDE_CAR_COMMANDS.exportSessionMarkdown, {
+      sessionId,
+    });
+  } catch {
+    return SESSION_EXPORT_FALLBACK;
+  }
+}
+
+export async function exportSessionRawJson(sessionId: string): Promise<SessionExportResult> {
+  try {
+    return await invoke<SessionExportResult>(SIDE_CAR_COMMANDS.exportSessionRawJson, {
+      sessionId,
+    });
+  } catch {
+    return SESSION_EXPORT_FALLBACK;
+  }
+}
+
+export async function getSessionFolder(sessionId: string): Promise<SessionFolderResult> {
+  try {
+    return await invoke<SessionFolderResult>(SIDE_CAR_COMMANDS.sessionFolder, { sessionId });
+  } catch {
+    return SESSION_FOLDER_FALLBACK;
   }
 }
 

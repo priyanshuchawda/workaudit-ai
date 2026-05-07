@@ -25,6 +25,9 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "desktop recorder lifecycle controls for a configured local sidecar" in readme
     assert "configured localhost sidecar launch/stop abstraction" in readme
     assert "real Windows active-window polling" in readme
+    assert "compressed PNG artifact storage" in readme
+    assert "bounded retention cleanup" in readme
+    assert "JPEG/WebP screenshot encoding" in readme
     assert "configured localhost sidecar URL or configured local sidecar binary/port" in readme
     assert "real Windows screenshot capture" in readme
     assert "metadata-only file watcher capture" in readme

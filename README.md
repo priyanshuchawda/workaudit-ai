@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with artifact storage, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, and hardened privacy redaction/private-mode suppression for implemented capture workers. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with compressed PNG artifact storage and retention cleanup, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, and hardened privacy redaction/private-mode suppression for implemented capture workers. It does not yet include terminal spying/global shell capture, OCR, audio transcription, embeddings, or local model integrations.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -32,7 +32,7 @@ MVP 1B now includes Tauri commands that can start, pause, resume, stop, and load
 
 MVP 1B now includes a Tauri sidecar launch abstraction for a configured local sidecar binary and localhost port. It starts the process with local-only sidecar host/port environment, suppresses sidecar stdio, stops the managed process safely, and still returns safe missing/unhealthy states when no configured binary is available. Packaging-ready sidecar binary lookup exists, Tauri is configured for a `worktrace-local-agent` external binary, and the Python sidecar has a local-only executable entrypoint. A local Windows package smoke has produced a PyInstaller sidecar artifact and NSIS installer with the sidecar artifact present. Python sidecar packaging is not bundled into the installer unless the target-triple sidecar artifact is produced before the Windows package build.
 
-MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, and safe screenshot deletion under the session artifact root. OCR is not implemented yet.
+MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width compressed PNG artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, bounded retention cleanup, and safe screenshot deletion under the session artifact root. JPEG/WebP screenshot encoding and OCR are not implemented yet.
 
 MVP 1C now includes a metadata-only file watcher worker for configured folders. It polls filesystem snapshots, emits created/modified/deleted/renamed raw events, ignores noisy build/dependency folders, marks sensitive file paths, and does not store file contents.
 
@@ -62,7 +62,7 @@ MVP 3 now includes a deterministic workflow debugger foundation that derives evi
 
 MVP 4 now includes 20 compact golden sessions and a deterministic eval runner that prints a reproducible benchmark table for timeline accuracy, blocker metrics, hallucinated evidence, privacy leaks, and estimated resource columns. This is not real Windows resource profiling yet.
 
-MVP 4 now includes deterministic recording resource budget checks and a fake 30-minute recording budget simulation for CPU, RAM, DB growth, screenshot storage, and model-loaded policy. This is not yet real Windows capture profiling.
+MVP 4 now includes deterministic recording resource budget checks, screenshot retention cleanup tests, and a fake 30-minute recording budget simulation for CPU, RAM, DB growth, screenshot storage, and model-loaded policy. This is not yet real Windows capture profiling.
 
 MVP dashboard work now includes desktop-accessible deterministic Markdown and raw JSON export review through the configured local sidecar bridge. The desktop shows preview text, export paths, evidence IDs, safe unavailable/error states, session-folder lookup status, and an honest AI report unavailable state because no real local model runtime is integrated yet.
 
@@ -72,7 +72,7 @@ MVP dashboard work now includes desktop session browser, session deletion, and f
 
 WorkTrace AI is a local-first desktop recorder and evidence timeline project. The implemented repo currently proves the foundations: typed contracts, SQLite WAL migrations, fake session storage/export, a Tauri shell, sidecar health, deterministic timeline/export/report foundations, model fallback states, selective AI-worker contracts, workflow debugging rules, golden evals, and deterministic resource budget checks.
 
-The project is still a foundation/demo repo. It now has real Windows active-window polling, screenshot capture, metadata-only file watcher capture, explicit safe terminal command ingestion, desktop recorder controls through a configured local sidecar bridge, desktop export review/screenshot metadata/delete UI, and a session browser with session deletion through the sidecar bridge. It is not packaged as a full live Windows recorder yet, not a live Windows recording benchmark, and not signed or production-distributed yet.
+The project is still a foundation/demo repo. It now has real Windows active-window polling, compressed PNG screenshot capture with bounded cleanup, metadata-only file watcher capture, explicit safe terminal command ingestion, desktop recorder controls through a configured local sidecar bridge, desktop export review/screenshot metadata/delete UI, and a session browser with session deletion through the sidecar bridge. It is not a live Windows recording benchmark and is not signed or production-distributed yet.
 
 ## Evidence and Verification
 
@@ -85,6 +85,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 ## Current Limitations
 
 - Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL or configured local sidecar binary/port; OCR and model runtimes are still not live.
+- Screenshot artifacts are currently stored as compressed PNG files with conservative retention cleanup. JPEG/WebP encoding decisions are documented as deferred until a dedicated image-encoding/runtime issue.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
 - The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, screenshot metadata/delete UI, and a session browser with session deletion. Session folder-open shows the local path only; no shell open is wired yet.
@@ -92,7 +93,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Python sidecar packaging is not bundled into the installer unless `pnpm --dir apps/desktop package:sidecar` first produces the expected target-triple sidecar executable for Tauri. The Windows installer build smoke has passed locally with that artifact present, but installer install/run QA has not been performed.
 - Local model runtimes and model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.
-- Resource budget checks use deterministic fake samples, not a live Windows recording benchmark.
+- Resource budget checks use deterministic fake samples plus storage cleanup tests, not a live Windows recording benchmark.
 
 ## What It Is
 
@@ -131,7 +132,7 @@ The first realistic MVP is planned to include:
 
 - start/pause/stop session
 - active window tracking
-- screenshot sampling with duplicate skipping
+- screenshot sampling with duplicate skipping and compressed PNG artifact storage
 - file events
 - safe terminal command detection
 - SQLite storage

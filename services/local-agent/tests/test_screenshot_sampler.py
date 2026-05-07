@@ -5,10 +5,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from worktrace_agent.capture.screenshot_sampler import (
+    ScreenshotArtifactFormat,
     ScreenshotFrame,
     ScreenshotSampler,
     ScreenshotSamplerConfig,
     ScreenshotSkipReason,
+    choose_screenshot_artifact_format,
 )
 from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.screenshots_repository import list_screenshots, save_screenshot
@@ -75,6 +77,15 @@ def test_sampler_defaults_accept_first_frame_and_skip_visual_duplicate() -> None
     assert sampler.config.max_width == 1280
 
 
+def test_screenshot_storage_policy_uses_lossless_png_and_defers_jpeg_webp() -> None:
+    decision = choose_screenshot_artifact_format(width=1920, height=1080)
+
+    assert decision.format is ScreenshotArtifactFormat.PNG
+    assert decision.file_extension == ".png"
+    assert decision.media_type == "image/png"
+    assert decision.reason == "lossless_png_currently_supported_jpeg_webp_deferred"
+
+
 def test_sampler_skips_frames_before_default_interval_and_scales_width_metadata() -> None:
     sampler = ScreenshotSampler()
     first = solid_frame(timestamp=STARTED_AT, width=2560, height=1440, value=90)
@@ -123,7 +134,7 @@ def test_accepted_screenshot_metadata_round_trips_through_sqlite(tmp_path: Path)
 
         assert screenshots == [decision.accepted]
         assert screenshots[0].source_event_id is None
-        assert screenshots[0].storage_path.endswith(".rgb")
+        assert screenshots[0].storage_path.endswith(".png")
     finally:
         connection.close()
 

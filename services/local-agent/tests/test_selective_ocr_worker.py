@@ -11,6 +11,7 @@ from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.ocr_repository import list_ocr_results, save_ocr_result
 from worktrace_agent.db.screenshots_repository import save_screenshot
 from worktrace_agent.db.session_state_repository import start_session
+from worktrace_agent.privacy.policy import PrivacyPolicy
 from worktrace_agent.privacy.redaction import (
     PRIVACY_TEST_CORPUS,
     REDACTION_TOKEN,
@@ -113,6 +114,104 @@ def test_non_high_value_screenshot_is_skipped_without_engine_call() -> None:
     assert engine.call_count == 0
 
 
+def test_private_mode_skips_ocr_without_engine_call() -> None:
+    engine = FakeOcrEngine(OcrEngineResult(text="not used", confidence=0.9))
+
+    decision = SelectiveOcrWorker(
+        privacy_policy=PrivacyPolicy(private_mode=True)
+    ).process_candidate(
+        OcrCandidate(
+            screenshot=build_screenshot("shot_private", visual_hash="privatehash"),
+            image_bytes=b"private",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=engine,
+    )
+
+    assert decision.result is None
+    assert decision.skipped is OcrSkipReason.PRIVACY_POLICY
+    assert engine.call_count == 0
+
+
+def test_blocklisted_app_skips_ocr_without_engine_call() -> None:
+    engine = FakeOcrEngine(OcrEngineResult(text="not used", confidence=0.9))
+
+    decision = SelectiveOcrWorker(
+        privacy_policy=PrivacyPolicy(blocklist=("Windows Terminal",))
+    ).process_candidate(
+        OcrCandidate(
+            screenshot=build_screenshot("shot_blocked", visual_hash="blockedhash"),
+            image_bytes=b"blocked",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=engine,
+    )
+
+    assert decision.result is None
+    assert decision.skipped is OcrSkipReason.PRIVACY_POLICY
+    assert engine.call_count == 0
+
+
+def test_secret_risk_screenshot_refuses_ocr_without_engine_call() -> None:
+    engine = FakeOcrEngine(OcrEngineResult(text="not used", confidence=0.9))
+
+    decision = SelectiveOcrWorker().process_candidate(
+        OcrCandidate(
+            screenshot=build_screenshot("shot_secret", visual_hash="secrethash"),
+            image_bytes=b"secret",
+            app_name="VS Code",
+            window_title=f".env token {PRIVACY_TEST_CORPUS[0]} pytest failure",
+        ),
+        engine=engine,
+    )
+
+    assert decision.result is None
+    assert decision.skipped is OcrSkipReason.SECRET_RISK
+    assert engine.call_count == 0
+
+
+def test_empty_image_bytes_are_rejected_before_engine_call() -> None:
+    engine = FakeOcrEngine(OcrEngineResult(text="not used", confidence=0.9))
+
+    try:
+        SelectiveOcrWorker().process_candidate(
+            OcrCandidate(
+                screenshot=build_screenshot("shot_empty", visual_hash="emptyhash"),
+                image_bytes=b"",
+                app_name="Windows Terminal",
+                window_title="pytest traceback",
+            ),
+            engine=engine,
+        )
+    except ValueError as error:
+        assert str(error) == "image_bytes must not be empty"
+    else:
+        raise AssertionError("empty image bytes should be rejected")
+
+    assert engine.call_count == 0
+
+
+def test_ocr_result_metadata_includes_screenshot_evidence_id() -> None:
+    engine = FakeOcrEngine(OcrEngineResult(text="Traceback: AssertionError", confidence=0.9))
+    screenshot = build_screenshot("shot_no_source_event", visual_hash="nosource")
+
+    decision = SelectiveOcrWorker().process_candidate(
+        OcrCandidate(
+            screenshot=screenshot,
+            image_bytes=b"terminal",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=engine,
+    )
+
+    assert decision.result is not None
+    assert decision.result.source_event_id is None
+    assert decision.result.metadata["evidence_ids"] == [screenshot.id]
+
+
 def test_ocr_results_table_exists_after_migrations(tmp_path: Path) -> None:
     connection = initialize_database(tmp_path / "worktrace.sqlite")
     try:
@@ -150,5 +249,5 @@ def build_screenshot(screenshot_id: str, *, visual_hash: str) -> ScreenshotArtif
         byte_size=1024,
         content_hash=f"content-{screenshot_id}",
         visual_hash=visual_hash,
-        storage_path=f"screenshots/{screenshot_id}.rgb",
+        storage_path=f"screenshots/{screenshot_id}.png",
     )

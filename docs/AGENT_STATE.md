@@ -1,18 +1,49 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 01:20 local / 2026-05-07 19:50 UTC
+2026-05-08 01:30 local / 2026-05-07 20:00 UTC
 
 ## Current Issue
-#95 — Gemma E4B deep mode
+#97 — Qwen3-VL selected-frame vision
 
 ## Current Branch
-feat/95-gemma-e4b-deep-mode
+feat/97-qwen3-vl-selected-frame-vision
 
 ## Current Phase
-PR preparation for #95 after full quality gate
+Self-reviewing #97 after full quality gate
 
 ## Completed Since Last Update
+- Merged #95 via PR #96 and confirmed issue #95 is closed.
+- Created #97: Qwen3-VL selected-frame vision.
+- Started branch `feat/97-qwen3-vl-selected-frame-vision` from updated `main`.
+- Read Qwen3-VL/model docs for #97, including `docs/Qwen3-VL-2B-Instruct.txt`, `docs/Qwen3-VL-4B-Instruct.md`, `docs/models/qwen.md`, and `docs/models/local_model_runtime.md`.
+- Inspected existing selected-frame policy code in `services/local-agent/src/worktrace_agent/ai/vision_analysis.py` and tests in `tests/test_selected_frame_vision_analysis.py`.
+- Wrote the #97 implementation plan at `docs/superpowers/plans/2026-05-08-qwen3-vl-selected-frame-vision.md`.
+- Added red tests for Qwen3-VL localhost URL validation, 2B/4B manifest metadata, fake transport payload/response parsing, safe runtime failures, image byte caps, model availability, and no heavy imports.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_qwen_vl_runtime.py tests/test_selected_frame_vision_analysis.py -q` failing on missing `worktrace_agent.ai.qwen_vl_runtime`.
+- Implemented `worktrace_agent.ai.qwen_vl_runtime` with localhost-only OpenAI-style chat transport, Qwen3-VL 2B/4B manifests, selected-frame analyzer, safe parsing, redacted prompt context, and availability config builder.
+- Added selected-frame evidence fallback coverage for screenshots without source event IDs.
+- Updated README/model docs for selected-frame-only Qwen3-VL adapter behavior and no-download/no-real-smoke limitations.
+- Focused #97 checks passed:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest tests/test_qwen_vl_runtime.py tests/test_selected_frame_vision_analysis.py tests/test_model_availability.py tests/test_portfolio_claim_discipline.py -q` (34 passed)
+- Re-ran the focused #97 checks from scratch after an interrupted command; format, Ruff, Pyright, and 34 focused tests passed.
+- Full #97 quality gate passed:
+  - `uv run --python 3.13 ruff format .` (93 files left unchanged)
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright` (0 errors)
+  - `uv run --python 3.13 pytest` (242 passed)
+  - `pnpm --dir packages/shared typecheck`
+  - `pnpm --dir packages/shared test` (14 passed)
+  - `pnpm --dir apps/desktop typecheck`
+  - `pnpm --dir apps/desktop lint`
+  - `pnpm --dir apps/desktop test` (28 passed)
+  - `pnpm --dir apps/desktop build`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - `cargo test --workspace` (31 passed)
 - Merged #93 via PR #94 and confirmed issue #93 is closed.
 - Created #95: Gemma E4B deep mode.
 - Started branch `feat/95-gemma-e4b-deep-mode` from updated `main`.
@@ -155,11 +186,12 @@ PR preparation for #95 after full quality gate
 - `docs/AGENT_STATE.md`
 - `README.md`
 - `docs/model-routing.md`
-- `docs/models/gemma.md`
 - `docs/models/local_model_runtime.md`
-- `docs/superpowers/plans/2026-05-08-gemma-e4b-deep-mode.md`
-- `services/local-agent/src/worktrace_agent/ai/gemma_manifest.py`
-- `services/local-agent/tests/test_gemma_model_manifest.py`
+- `docs/models/qwen.md`
+- `docs/superpowers/plans/2026-05-08-qwen3-vl-selected-frame-vision.md`
+- `services/local-agent/src/worktrace_agent/ai/qwen_vl_runtime.py`
+- `services/local-agent/tests/test_qwen_vl_runtime.py`
+- `services/local-agent/tests/test_selected_frame_vision_analysis.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -322,15 +354,13 @@ PR preparation for #95 after full quality gate
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #95 does not change sidecar packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #95 does not change installer packaging.
-- Real Gemma/Ollama E4B smoke — not run; #95 adds metadata/selection guardrails only and does not download, install, start, or load models.
+- Real Qwen3-VL runtime smoke not run yet; this issue is an adapter/fake-transport slice with no model download/startup.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run final diff/whitespace checks, stage scoped #95 files, commit, push, and open PR.
+Run `git diff --check`, self-review the #97 diff, then stage/commit/push/open PR if clean.
 
 ## Do Not Forget
 - No OCR before OCR issue.

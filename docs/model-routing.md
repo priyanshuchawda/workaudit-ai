@@ -47,6 +47,17 @@ Embedding runtime policy:
 - no remote embedding endpoint or cloud vector database by default
 - vector storage decision: SQLite vectors first for smaller local indexes, local file index later only when benchmarked scale requires it
 
+Selected-frame vision policy:
+
+- Qwen3-VL may run only on an explicitly selected screenshot/frame.
+- Continuous VLM loops are forbidden.
+- Likely secret-risk screens must refuse detailed extraction before any VLM call.
+- Selected-frame analysis must cite screenshot or source event evidence IDs.
+- Qwen3-VL-2B is the preferred laptop-safe metadata target.
+- Qwen3-VL-4B is manual-only and unavailable until benchmarked safe on the target laptop.
+- Qwen3-VL runtime calls must use localhost-only adapters with fakeable transports.
+- No Qwen3-VL model download, bundled model, or real runtime startup is enabled by default.
+
 Default report model config:
 
 - Default local report model: Gemma 4 E2B-it Q4.

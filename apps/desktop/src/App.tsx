@@ -8,10 +8,13 @@ import {
   type RawTimelineEvent,
 } from "./features/timeline/raw-timeline-simulation";
 import {
+  cancelAiReport,
   deleteSession,
   deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
+  generateAiReport,
+  getAiReportStatus,
   getSessionEvents,
   getSessionFolder,
   getSessionScreenshots,
@@ -23,6 +26,8 @@ import {
   startSidecar,
   stopRecordingSession,
   stopSidecar,
+  type AiReportClaim,
+  type AiReportResult,
   type RecorderControlResult,
   type RecorderSession,
   type ScreenshotDeletionResult,
@@ -98,6 +103,8 @@ type SessionDeletionState =
   | { status: "idle" | "loading" | "unavailable"; message: string; result: null }
   | { status: "success"; message: string; result: SessionDeletionResult };
 
+type AiReportReviewState = AiReportResult;
+
 const eventFilters: { label: string; value: EventFilter }[] = [
   { label: "All", value: "all" },
   { label: "Active windows", value: "active_window" },
@@ -155,6 +162,19 @@ const initialSessionDeletionState: SessionDeletionState = {
   result: null,
 };
 
+const initialAiReportReviewState: AiReportReviewState = {
+  status: "runtime_unavailable",
+  message: "Connect to a stopped sidecar session before generating a local AI report.",
+  canGenerate: false,
+  report: null,
+  evidenceIds: [],
+  modelName: null,
+  modelVersion: null,
+  runtimeMs: null,
+  inputHash: null,
+  generatedAt: null,
+};
+
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
@@ -166,6 +186,8 @@ function App() {
     useState<ExportReviewState>(initialExportReviewState);
   const [folderReview, setFolderReview] =
     useState<FolderReviewState>(initialFolderReviewState);
+  const [aiReportReview, setAiReportReview] =
+    useState<AiReportReviewState>(initialAiReportReviewState);
   const [screenshotReview, setScreenshotReview] =
     useState<ScreenshotReviewState>(initialScreenshotReviewState);
   const [screenshotDeletion, setScreenshotDeletion] =
@@ -186,6 +208,7 @@ function App() {
     sessionEvents.status === "available" ? "Latest sidecar session" : "Fixture preview session";
   const reviewSessionId =
     recorderSession?.id ?? (sessionEvents.status === "available" ? "latest" : null);
+  const canRequestAiReport = Boolean(reviewSessionId) && recorderStatus !== "recording" && recorderStatus !== "paused";
 
   const refreshSidecarHealth = useCallback(async () => {
     setSidecarHealth(initialSidecarHealth);
@@ -345,6 +368,26 @@ function App() {
     applyFolderResult(await getSessionFolder(reviewSessionId));
   };
 
+  const handleGenerateAiReport = async () => {
+    if (!reviewSessionId || !canRequestAiReport || !aiReportReview.canGenerate) {
+      return;
+    }
+    setAiReportReview({
+      ...aiReportReview,
+      status: "running",
+      message: "Local AI report generation is running.",
+      report: null,
+    });
+    setAiReportReview(await generateAiReport(reviewSessionId));
+  };
+
+  const handleCancelAiReport = async () => {
+    if (!reviewSessionId) {
+      return;
+    }
+    setAiReportReview(await cancelAiReport(reviewSessionId));
+  };
+
   const applyScreenshotResult = (result: SessionScreenshotsResult) => {
     if (result.status === "unavailable") {
       setScreenshotReview({
@@ -495,6 +538,35 @@ function App() {
       const result = await getSessionScreenshots(reviewSessionId);
       if (isMounted) {
         applyScreenshotResult(result);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [reviewSessionId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void Promise.resolve().then(async () => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (!reviewSessionId) {
+        setAiReportReview(initialAiReportReviewState);
+        return;
+      }
+
+      setAiReportReview({
+        ...initialAiReportReviewState,
+        status: "loading",
+        message: "Checking local AI report runtime.",
+      });
+      const result = await getAiReportStatus(reviewSessionId);
+      if (isMounted) {
+        setAiReportReview(result);
       }
     });
 
@@ -676,11 +748,15 @@ function App() {
             />
 
             <ExportReviewPanel
+              aiReportState={aiReportReview}
               canReview={Boolean(reviewSessionId)}
+              canRequestAiReport={canRequestAiReport}
               exportState={exportReview}
               folderState={folderReview}
+              onCancelAiReport={handleCancelAiReport}
               onExportMarkdown={handleExportMarkdown}
               onExportRawJson={handleExportRawJson}
+              onGenerateAiReport={handleGenerateAiReport}
               onOpenSessionFolder={handleOpenSessionFolder}
             />
 
@@ -942,24 +1018,43 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
 }
 
 function ExportReviewPanel({
+  aiReportState,
   canReview,
+  canRequestAiReport,
   exportState,
   folderState,
+  onCancelAiReport,
   onExportMarkdown,
   onExportRawJson,
+  onGenerateAiReport,
   onOpenSessionFolder,
 }: {
+  aiReportState: AiReportReviewState;
   canReview: boolean;
+  canRequestAiReport: boolean;
   exportState: ExportReviewState;
   folderState: FolderReviewState;
+  onCancelAiReport: () => void;
   onExportMarkdown: () => void;
   onExportRawJson: () => void;
+  onGenerateAiReport: () => void;
   onOpenSessionFolder: () => void;
 }) {
   const isExportBusy = exportState.status === "loading";
   const isFolderBusy = folderState.status === "loading";
+  const isAiReportRunning = aiReportState.status === "running" || aiReportState.status === "loading";
   const controlsDisabled = !canReview || isExportBusy;
   const folderDisabled = !canReview || isFolderBusy;
+  const aiGenerateLabel =
+    aiReportState.status === "complete" ? "Regenerate local AI report" : "Generate local AI report";
+  const aiGenerateDisabled =
+    !canReview || !canRequestAiReport || !aiReportState.canGenerate || isAiReportRunning;
+  const aiPanelTone =
+    aiReportState.status === "complete" || aiReportState.status === "ready"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+      : aiReportState.status === "running" || aiReportState.status === "loading"
+        ? "border-sky-300 bg-sky-50 text-sky-950"
+        : "border-amber-300 bg-amber-50 text-amber-950";
 
   return (
     <section
@@ -1040,15 +1135,108 @@ function ExportReviewPanel({
         <p className="font-semibold text-zinc-950">{folderState.message}</p>
         {folderState.path ? <p className="mt-2 break-all text-zinc-700">{folderState.path}</p> : null}
       </div>
-      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-        <h3 className="font-semibold tracking-normal">AI report unavailable</h3>
-        <p className="mt-2 leading-6">
-          Real local LLM report generation is not wired into the desktop yet. Use deterministic
-          Markdown or raw JSON export for review.
-        </p>
+      <div className={`mt-3 rounded-md border p-3 text-sm ${aiPanelTone}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-semibold tracking-normal">
+            {aiReportHeading(aiReportState.status)}
+          </h3>
+          <button
+            className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+            disabled={aiGenerateDisabled}
+            onClick={onGenerateAiReport}
+            type="button"
+          >
+            {aiGenerateLabel}
+          </button>
+          {aiReportState.status === "running" ? (
+            <button
+              className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold"
+              onClick={onCancelAiReport}
+              type="button"
+            >
+              Cancel local AI report
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-2 leading-6">{aiReportState.message}</p>
+        {aiReportState.modelName || aiReportState.runtimeMs !== null || aiReportState.inputHash ? (
+          <dl className="mt-3 grid gap-2 text-xs text-zinc-700">
+            {aiReportState.modelName ? (
+              <MetadataRow label="Model" value={aiReportState.modelName} />
+            ) : null}
+            {aiReportState.runtimeMs !== null ? (
+              <MetadataRow label="Run time" value={`${aiReportState.runtimeMs} ms`} />
+            ) : null}
+            {aiReportState.inputHash ? (
+              <MetadataRow label="Input hash" value={aiReportState.inputHash} />
+            ) : null}
+          </dl>
+        ) : null}
+        {aiReportState.evidenceIds.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {aiReportState.evidenceIds.map((evidenceId) => (
+              <span
+                className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700"
+                key={evidenceId}
+              >
+                {evidenceId}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {aiReportState.report ? <AiReportPreview report={aiReportState.report} /> : null}
       </div>
     </section>
   );
+}
+
+function aiReportHeading(status: AiReportReviewState["status"]) {
+  if (status === "complete") {
+    return "AI report complete";
+  }
+  if (status === "ready") {
+    return "AI report ready";
+  }
+  if (status === "running" || status === "loading") {
+    return "AI report running";
+  }
+  if (status === "cancelled") {
+    return "AI report cancelled";
+  }
+  return "AI report unavailable";
+}
+
+function AiReportPreview({ report }: { report: AiReportResult["report"] }) {
+  if (!report) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-zinc-200 bg-white p-3 text-zinc-800">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        {report.sessionTitle}
+      </p>
+      <p className="mt-2 text-sm leading-6">{claimText(report.summary)}</p>
+      {report.commands.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {report.commands.map((command, index) => (
+            <li className="rounded-md border border-zinc-200 bg-zinc-50 p-2" key={index}>
+              <p className="break-all text-xs font-semibold text-zinc-800">
+                {claimText(command)}
+              </p>
+              <p className="mt-1 break-all text-xs text-zinc-500">
+                {command.evidenceEventIds.join(", ")}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function claimText(claim: AiReportClaim) {
+  return claim.text ?? claim.command ?? claim.title ?? claim.path ?? "Evidence-cited claim";
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

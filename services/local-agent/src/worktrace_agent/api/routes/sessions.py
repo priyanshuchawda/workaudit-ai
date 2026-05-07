@@ -6,6 +6,11 @@ from typing import cast
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from worktrace_agent.api.ai_report_service import (
+    AiReportService,
+    failed_ai_report_result,
+    safe_ai_report_result,
+)
 from worktrace_agent.api.session_recorder_service import (
     SessionDeletionResult,
     SessionExportPreview,
@@ -134,6 +139,19 @@ class DeleteSessionResponse(BaseModel):
     missing_screenshot_files: int
     deleted_screenshot_rows: int
     removed_artifact_root: bool
+
+
+class AiReportResponse(BaseModel):
+    status: str
+    message: str
+    can_generate: bool
+    report: dict[str, object] | None
+    evidence_ids: list[str]
+    model_name: str | None
+    model_version: str | None
+    runtime_ms: int | None
+    input_hash: str | None
+    generated_at: str | None
 
 
 @router.get("", response_model=SessionsResponse)
@@ -307,6 +325,38 @@ async def export_recording_session_raw_json(
     return _session_export_response(export)
 
 
+@router.get("/{session_id}/ai-report/status", response_model=AiReportResponse)
+async def get_ai_report_status(session_id: str, request: Request) -> AiReportResponse:
+    service = _ai_report_service(request)
+    try:
+        result = service.status(session_id=session_id)
+    except Exception:
+        result = failed_ai_report_result()
+    return AiReportResponse.model_validate(safe_ai_report_result(result))
+
+
+@router.post("/{session_id}/ai-report/generate", response_model=AiReportResponse)
+async def generate_ai_report(session_id: str, request: Request) -> AiReportResponse:
+    session_service = _session_service(request)
+    service = _ai_report_service(request)
+    events = session_service.list_session_events(session_id=session_id)
+    try:
+        result = service.generate(session_id=session_id, events=events)
+    except Exception:
+        result = failed_ai_report_result()
+    return AiReportResponse.model_validate(safe_ai_report_result(result))
+
+
+@router.post("/{session_id}/ai-report/cancel", response_model=AiReportResponse)
+async def cancel_ai_report(session_id: str, request: Request) -> AiReportResponse:
+    service = _ai_report_service(request)
+    try:
+        result = service.cancel(session_id=session_id)
+    except Exception:
+        result = failed_ai_report_result()
+    return AiReportResponse.model_validate(safe_ai_report_result(result))
+
+
 @router.get("/{session_id}/folder", response_model=SessionFolderResponse)
 async def get_recording_session_folder(
     session_id: str,
@@ -335,6 +385,10 @@ async def delete_recording_session(
 
 def _session_service(request: Request) -> SessionRecorderService:
     return cast(SessionRecorderService, request.app.state.session_recorder_service)
+
+
+def _ai_report_service(request: Request) -> AiReportService:
+    return cast(AiReportService, request.app.state.ai_report_service)
 
 
 def _session_response(session: SessionRecord) -> SessionResponse:

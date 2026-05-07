@@ -13,6 +13,8 @@ Rules:
 
 For #83, a localhost-only report runtime adapter may call a user-managed local model service through an injectable transport. WorkTrace still does not bundle, download, start, or manage model files or model servers in this issue.
 
+For #85, the desktop local AI report panel is wired through React, Tauri, and FastAPI boundary commands for status, generate, and cancel. The default service remains unavailable without a configured local runtime. The UI must not show full prompts and must not fake success.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

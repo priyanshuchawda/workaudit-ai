@@ -2,10 +2,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
+  cancelAiReport,
   deleteSession,
   deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
+  generateAiReport,
+  getAiReportStatus,
   getSessionEvents,
   getSessionFolder,
   getSessionScreenshots,
@@ -17,6 +20,7 @@ import {
   startSidecar,
   stopRecordingSession,
   stopSidecar,
+  type AiReportResult,
   type RecorderControlResult,
   type ScreenshotDeletionResult,
   type SessionDeletionResult,
@@ -29,10 +33,13 @@ import {
 } from "./lib/tauri-client";
 
 vi.mock("./lib/tauri-client", () => ({
+  cancelAiReport: vi.fn(),
   deleteSession: vi.fn(),
   deleteSessionScreenshots: vi.fn(),
   exportSessionMarkdown: vi.fn(),
   exportSessionRawJson: vi.fn(),
+  generateAiReport: vi.fn(),
+  getAiReportStatus: vi.fn(),
   getSessionEvents: vi.fn(),
   getSessionFolder: vi.fn(),
   getSessionScreenshots: vi.fn(),
@@ -68,6 +75,9 @@ const healthySidecar: SidecarHealth = {
 };
 
 const getSidecarHealthMock = vi.mocked(getSidecarHealth);
+const getAiReportStatusMock = vi.mocked(getAiReportStatus);
+const generateAiReportMock = vi.mocked(generateAiReport);
+const cancelAiReportMock = vi.mocked(cancelAiReport);
 const getSessionEventsMock = vi.mocked(getSessionEvents);
 const getSessionScreenshotsMock = vi.mocked(getSessionScreenshots);
 const deleteSessionScreenshotsMock = vi.mocked(deleteSessionScreenshots);
@@ -145,6 +155,52 @@ const folderResult: SessionFolderResult = {
   path: "C:/WorkTrace/sessions/sess_live_001",
 };
 
+const readyAiReportStatus: AiReportResult = {
+  status: "ready",
+  message: "Local AI report runtime is ready.",
+  canGenerate: true,
+  report: null,
+  evidenceIds: [],
+  modelName: "fake-local-report-model",
+  modelVersion: "fake-v1",
+  runtimeMs: null,
+  inputHash: null,
+  generatedAt: null,
+};
+
+const completeAiReport: AiReportResult = {
+  status: "complete",
+  message: "Local AI report generated.",
+  canGenerate: true,
+  report: {
+    sessionId: "sess_live_001",
+    sessionTitle: "AI report UI fixture",
+    summary: {
+      text: "Tests ran successfully.",
+      evidenceEventIds: ["evt_ai_ui_001"],
+    },
+    timeline: [],
+    blockers: [],
+    repeatedActions: [],
+    importantFiles: [],
+    commands: [
+      {
+        command: "pnpm test",
+        evidenceEventIds: ["evt_ai_ui_001"],
+      },
+    ],
+    workflowSteps: [],
+    confidence: 0.8,
+    knownEvidenceEventIds: ["evt_ai_ui_001"],
+  },
+  evidenceIds: ["evt_ai_ui_001"],
+  modelName: "fake-local-report-model",
+  modelVersion: "fake-v1",
+  runtimeMs: 42,
+  inputHash: "sha256:fake-input-hash",
+  generatedAt: "2026-05-06T09:15:10+05:30",
+};
+
 const screenshotMetadata: SessionScreenshotsResult = {
   status: "available",
   message: "Screenshot metadata loaded.",
@@ -175,6 +231,45 @@ const screenshotDeletion: ScreenshotDeletionResult = {
 };
 
 beforeEach(() => {
+  getAiReportStatusMock.mockReset();
+  getAiReportStatusMock.mockResolvedValue({
+    status: "runtime_unavailable",
+    message: "Local AI report runtime is unavailable. Recording, timeline, and export continue.",
+    canGenerate: false,
+    report: null,
+    evidenceIds: [],
+    modelName: null,
+    modelVersion: null,
+    runtimeMs: null,
+    inputHash: null,
+    generatedAt: null,
+  });
+  generateAiReportMock.mockReset();
+  generateAiReportMock.mockResolvedValue({
+    status: "runtime_unavailable",
+    message: "Local AI report runtime is unavailable. Recording, timeline, and export continue.",
+    canGenerate: false,
+    report: null,
+    evidenceIds: [],
+    modelName: null,
+    modelVersion: null,
+    runtimeMs: null,
+    inputHash: null,
+    generatedAt: null,
+  });
+  cancelAiReportMock.mockReset();
+  cancelAiReportMock.mockResolvedValue({
+    status: "cancelled",
+    message: "Local AI report generation cancelled.",
+    canGenerate: true,
+    report: null,
+    evidenceIds: [],
+    modelName: null,
+    modelVersion: null,
+    runtimeMs: null,
+    inputHash: null,
+    generatedAt: null,
+  });
   getSessionEventsMock.mockReset();
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
   getSessionScreenshotsMock.mockReset();
@@ -598,6 +693,153 @@ test("shows safe export error state when the sidecar export bridge is unavailabl
 
   expect(await within(exportPanel).findByText("Session export bridge is unavailable.")).toBeInTheDocument();
   expect(within(exportPanel).getByText("No export preview available yet.")).toBeInTheDocument();
+});
+
+test("shows model unavailable state and disables local AI report generation", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+
+  await within(exportPanel).findByText(
+    "Local AI report runtime is unavailable. Recording, timeline, and export continue.",
+  );
+  expect(getAiReportStatusMock).toHaveBeenCalledWith("latest");
+  expect(within(exportPanel).getByRole("button", { name: "Generate local AI report" })).toBeDisabled();
+});
+
+test("generates a local AI report with evidence IDs and model metadata", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_ai_ui_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "Terminal command",
+        windowTitle: "powershell: pnpm test",
+        source: "terminal_command_detector",
+        type: "terminal_command",
+      },
+    ],
+  });
+  getAiReportStatusMock.mockResolvedValue(readyAiReportStatus);
+  generateAiReportMock.mockResolvedValue(completeAiReport);
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+  await within(exportPanel).findByText("Local AI report runtime is ready.");
+  fireEvent.click(await within(exportPanel).findByRole("button", { name: "Generate local AI report" }));
+
+  expect(generateAiReportMock).toHaveBeenCalledWith("latest");
+  expect(await within(exportPanel).findByText("Local AI report generated.")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("Tests ran successfully.")).toBeInTheDocument();
+  expect(within(exportPanel).getAllByText("evt_ai_ui_001").length).toBeGreaterThan(0);
+  expect(within(exportPanel).getByText("fake-local-report-model")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("42 ms")).toBeInTheDocument();
+  expect(within(exportPanel).getByText("sha256:fake-input-hash")).toBeInTheDocument();
+  expect(within(exportPanel).getByRole("button", { name: "Regenerate local AI report" })).toBeInTheDocument();
+  expect(within(exportPanel).queryByText(/full prompt/i)).not.toBeInTheDocument();
+});
+
+test("shows failed safely state when local AI report validation fails", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_ai_ui_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "Terminal command",
+        windowTitle: "powershell: pnpm test",
+        source: "terminal_command_detector",
+        type: "terminal_command",
+      },
+    ],
+  });
+  getAiReportStatusMock.mockResolvedValue(readyAiReportStatus);
+  generateAiReportMock.mockResolvedValue({
+    status: "failed_safely",
+    message: "Local report output could not be validated after one retry.",
+    canGenerate: true,
+    report: null,
+    evidenceIds: [],
+    modelName: "fake-local-report-model",
+    modelVersion: "fake-v1",
+    runtimeMs: null,
+    inputHash: "sha256:fake-input-hash",
+    generatedAt: null,
+  });
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+  await within(exportPanel).findByText("Local AI report runtime is ready.");
+  fireEvent.click(await within(exportPanel).findByRole("button", { name: "Generate local AI report" }));
+
+  expect(
+    await within(exportPanel).findByText("Local report output could not be validated after one retry."),
+  ).toBeInTheDocument();
+  expect(within(exportPanel).queryByText(/full prompt/i)).not.toBeInTheDocument();
+});
+
+test("cancels a running local AI report", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_ai_ui_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "Terminal command",
+        windowTitle: "powershell: pnpm test",
+        source: "terminal_command_detector",
+        type: "terminal_command",
+      },
+    ],
+  });
+  getAiReportStatusMock.mockResolvedValue(readyAiReportStatus);
+  generateAiReportMock.mockReturnValue(new Promise(() => undefined));
+
+  render(<App />);
+
+  const exportPanel = await screen.findByRole("region", { name: "Export and report review" });
+  await within(exportPanel).findByText("Local AI report runtime is ready.");
+  fireEvent.click(await within(exportPanel).findByRole("button", { name: "Generate local AI report" }));
+  fireEvent.click(await within(exportPanel).findByRole("button", { name: "Cancel local AI report" }));
+
+  expect(cancelAiReportMock).toHaveBeenCalledWith("latest");
+  expect(await within(exportPanel).findByText("Local AI report generation cancelled.")).toBeInTheDocument();
+});
+
+test("does not generate a local AI report while recording is active", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  startRecordingSessionMock.mockResolvedValue(recordingControl);
+  getAiReportStatusMock.mockResolvedValue(readyAiReportStatus);
+
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Start recording" }));
+  expect(await screen.findByText("Recording")).toBeInTheDocument();
+
+  const exportPanel = screen.getByRole("region", { name: "Export and report review" });
+  expect(within(exportPanel).getByRole("button", { name: "Generate local AI report" })).toBeDisabled();
+  expect(generateAiReportMock).not.toHaveBeenCalled();
 });
 
 test("starts pauses resumes and stops a recorder session from the desktop controls", async () => {

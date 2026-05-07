@@ -1,7 +1,7 @@
 use crate::services::sidecar::{
-    RecorderControlResult, ScreenshotDeletionResult, SessionDeletionResult, SessionEventsResult,
-    SessionExportResult, SessionFolderResult, SessionListResult, SessionScreenshotsResult,
-    SidecarHealth, SidecarService,
+    AiReportResult, RecorderControlResult, ScreenshotDeletionResult, SessionDeletionResult,
+    SessionEventsResult, SessionExportResult, SessionFolderResult, SessionListResult,
+    SessionScreenshotsResult, SidecarHealth, SidecarService,
 };
 
 #[tauri::command]
@@ -57,6 +57,21 @@ pub fn export_session_markdown(session_id: String) -> SessionExportResult {
 #[tauri::command]
 pub fn export_session_raw_json(session_id: String) -> SessionExportResult {
     SidecarService.export_session_raw_json(session_id)
+}
+
+#[tauri::command]
+pub fn get_ai_report_status(session_id: String) -> AiReportResult {
+    SidecarService.ai_report_status(session_id)
+}
+
+#[tauri::command]
+pub fn generate_ai_report(session_id: String) -> AiReportResult {
+    SidecarService.generate_ai_report(session_id)
+}
+
+#[tauri::command]
+pub fn cancel_ai_report(session_id: String) -> AiReportResult {
+    SidecarService.cancel_ai_report(session_id)
 }
 
 #[tauri::command]

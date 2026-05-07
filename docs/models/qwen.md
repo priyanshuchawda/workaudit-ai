@@ -19,4 +19,14 @@ Current embedding adapter notes:
 - Embeddings are retrieval helpers only; no claim generation without evidence IDs.
 - Real local runtime smoke, benchmarked vector index persistence, and model-server setup are deferred.
 
-Future Qwen runtime work must be selected-frame/manual only for vision and evidence-cited for text report behavior.
+Current selected-frame vision adapter notes:
+
+- Default metadata target: `Qwen/Qwen3-VL-2B-Instruct`.
+- Manual-only metadata target: `Qwen/Qwen3-VL-4B-Instruct`.
+- Localhost-only OpenAI-style `/v1/chat/completions` adapter with fakeable JSON transport.
+- Selected screenshot/frame evidence is required by the policy layer.
+- Likely secret-risk screens are refused before runtime calls.
+- Continuous VLM remains forbidden.
+- Real local Qwen3-VL smoke, desktop UI, bundled model files, and model-server setup are deferred.
+
+Future Qwen runtime work must remain selected-frame/manual only for vision and evidence-cited for text report behavior.

@@ -118,6 +118,23 @@ def test_error_dialog_selected_frame_is_analyzed_with_evidence_and_redaction() -
     assert analyzer.requests[0].image_bytes == b"fake-selected-frame"
 
 
+def test_selected_frame_without_source_event_uses_screenshot_evidence_id() -> None:
+    decision = analyze_selected_frame(
+        vision_request(source_event_id=None),
+        analyzer=FakeVisionAnalyzer(
+            VisionAnalyzerResult(
+                title="Selected frame",
+                description="Selected screenshot reviewed.",
+                confidence=0.8,
+            )
+        ),
+    )
+
+    assert decision.status == "analyzed"
+    assert decision.result is not None
+    assert decision.result.evidence_event_ids == ("shot_vision_001",)
+
+
 def test_analyzer_failure_is_safe_and_redacted() -> None:
     decision = analyze_selected_frame(
         vision_request(),

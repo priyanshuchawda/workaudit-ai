@@ -25,6 +25,8 @@ For #93, WorkTrace adds an optional real PaddleOCR adapter path behind selective
 
 For #95, WorkTrace adds manual-only Gemma 4 E4B-it Q4 deep-mode metadata and selection guardrails. E4B is never the default, is disabled during recording, falls back to E2B when memory pressure is high or E4B is unavailable, and remains capped at 16384 context tokens until benchmark evidence justifies more.
 
+For #97, WorkTrace adds a localhost-only Qwen3-VL selected-frame adapter for user-managed local VLM services. Qwen3-VL-2B is the laptop-safe metadata default, Qwen3-VL-4B is manual-only until benchmarked, and VLM analysis remains selected-frame only with no model download, bundled weights, or continuous loop.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

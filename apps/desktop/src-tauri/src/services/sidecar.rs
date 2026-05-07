@@ -106,6 +106,50 @@ pub struct RecorderControlResult {
     pub session: Option<RecorderSession>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionExportStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct SessionExportPreview {
+    pub format: String,
+    pub path: String,
+    pub preview: String,
+    pub evidence_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionExportResult {
+    pub status: SessionExportStatus,
+    pub message: String,
+    pub export: Option<SessionExportPreview>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionFolderStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+struct SidecarSessionFolderResponse {
+    path: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionFolderResult {
+    pub status: SessionFolderStatus,
+    pub message: String,
+    pub path: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct SidecarEventsResponse {
     events: Vec<SidecarRawEvent>,
@@ -311,6 +355,83 @@ impl SidecarService {
         )
     }
 
+    pub fn export_session_markdown(&self, session_id: String) -> SessionExportResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_export();
+        };
+
+        self.export_session_markdown_from_base_url(session_id, &base_url)
+    }
+
+    pub fn export_session_markdown_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> SessionExportResult {
+        self.export_session_from_base_url(
+            session_id,
+            base_url,
+            "markdown",
+            "Markdown export generated.",
+        )
+    }
+
+    pub fn export_session_raw_json(&self, session_id: String) -> SessionExportResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_export();
+        };
+
+        self.export_session_raw_json_from_base_url(session_id, &base_url)
+    }
+
+    pub fn export_session_raw_json_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> SessionExportResult {
+        self.export_session_from_base_url(
+            session_id,
+            base_url,
+            "raw-json",
+            "Raw JSON export generated.",
+        )
+    }
+
+    pub fn session_folder(&self, session_id: String) -> SessionFolderResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_folder();
+        };
+
+        self.session_folder_from_base_url(session_id, &base_url)
+    }
+
+    pub fn session_folder_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> SessionFolderResult {
+        if session_id.trim().is_empty() {
+            return unavailable_folder();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_folder();
+        };
+        let path = format!("/sessions/{}/folder", encode_path_segment(&session_id));
+        let Ok(body_text) = request_local_json(&endpoint, "GET", &path, None) else {
+            return unavailable_folder();
+        };
+        let Ok(folder) = serde_json::from_str::<SidecarSessionFolderResponse>(&body_text) else {
+            return unavailable_folder();
+        };
+
+        SessionFolderResult {
+            status: SessionFolderStatus::Available,
+            message: "Session folder is available.".to_string(),
+            path: Some(redact_text(&folder.path)),
+        }
+    }
+
     pub fn events_from_base_url(&self, session_id: String, base_url: &str) -> SessionEventsResult {
         if session_id.trim().is_empty() {
             return unavailable_events();
@@ -385,6 +506,39 @@ impl SidecarService {
             session: Some(session.redacted()),
         }
     }
+
+    fn export_session_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+        format_path: &str,
+        message: &str,
+    ) -> SessionExportResult {
+        if session_id.trim().is_empty() {
+            return unavailable_export();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_export();
+        };
+        let path = format!(
+            "/sessions/{}/exports/{}",
+            encode_path_segment(&session_id),
+            format_path
+        );
+        let Ok(body_text) = request_local_json(&endpoint, "POST", &path, None) else {
+            return unavailable_export();
+        };
+        let Ok(export) = serde_json::from_str::<SessionExportPreview>(&body_text) else {
+            return unavailable_export();
+        };
+
+        SessionExportResult {
+            status: SessionExportStatus::Available,
+            message: message.to_string(),
+            export: Some(export.redacted()),
+        }
+    }
 }
 
 fn missing_health(message: &str) -> SidecarHealth {
@@ -429,6 +583,22 @@ fn unavailable_recorder_control() -> RecorderControlResult {
     }
 }
 
+fn unavailable_export() -> SessionExportResult {
+    SessionExportResult {
+        status: SessionExportStatus::Unavailable,
+        message: "Session export bridge is unavailable.".to_string(),
+        export: None,
+    }
+}
+
+fn unavailable_folder() -> SessionFolderResult {
+    SessionFolderResult {
+        status: SessionFolderStatus::Unavailable,
+        message: "Session folder bridge is unavailable.".to_string(),
+        path: None,
+    }
+}
+
 impl RecorderSession {
     fn redacted(self) -> Self {
         Self {
@@ -439,6 +609,21 @@ impl RecorderSession {
             title: self.title.map(|title| redact_text(&title)),
             storage_path: self.storage_path.map(|path| redact_text(&path)),
             privacy_mode: redact_text(&self.privacy_mode),
+        }
+    }
+}
+
+impl SessionExportPreview {
+    fn redacted(self) -> Self {
+        Self {
+            format: redact_text(&self.format),
+            path: redact_text(&self.path),
+            preview: redact_text(&self.preview),
+            evidence_ids: self
+                .evidence_ids
+                .into_iter()
+                .map(|evidence_id| redact_text(&evidence_id))
+                .collect(),
         }
     }
 }

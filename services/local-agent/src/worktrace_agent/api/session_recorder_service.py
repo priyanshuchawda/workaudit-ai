@@ -38,13 +38,30 @@ from worktrace_agent.db.session_state_repository import (
 )
 from worktrace_agent.domain.raw_event import RawEvent
 from worktrace_agent.domain.session_state import SessionRecord
+from worktrace_agent.exporters.markdown import export_session_markdown
+from worktrace_agent.exporters.raw_json import export_redacted_raw_json
 from worktrace_agent.privacy.policy import PrivacyPolicy
+
+EXPORT_PREVIEW_MAX_CHARS = 4_000
 
 
 @dataclass
 class RunningRecorder:
     recorder: ActiveWindowRecorder
     task: asyncio.Task[None]
+
+
+@dataclass(frozen=True)
+class SessionExportPreview:
+    format: str
+    path: Path
+    preview: str
+    evidence_ids: list[str]
+
+
+@dataclass(frozen=True)
+class SessionFolder:
+    path: Path
 
 
 class SessionRecorderService:
@@ -168,6 +185,44 @@ class SessionRecorderService:
             artifact_root=self._artifact_root_for_session_id(session_id),
         )
 
+    def export_session_markdown_preview(self, *, session_id: str) -> SessionExportPreview:
+        resolved_session_id = self._require_session_id(session_id)
+        export_path = (
+            self._artifact_root_for_session_id(resolved_session_id) / "exports" / "session.md"
+        )
+        written_path = export_session_markdown(
+            self._connection,
+            resolved_session_id,
+            export_path,
+        )
+        return SessionExportPreview(
+            format="markdown",
+            path=written_path,
+            preview=_preview_text(written_path),
+            evidence_ids=self._evidence_ids_for_session(resolved_session_id),
+        )
+
+    def export_session_raw_json_preview(self, *, session_id: str) -> SessionExportPreview:
+        resolved_session_id = self._require_session_id(session_id)
+        export_path = (
+            self._artifact_root_for_session_id(resolved_session_id) / "exports" / "session.raw.json"
+        )
+        written_path = export_redacted_raw_json(
+            self._connection,
+            resolved_session_id,
+            export_path,
+        )
+        return SessionExportPreview(
+            format="raw_json",
+            path=written_path,
+            preview=_preview_text(written_path),
+            evidence_ids=self._evidence_ids_for_session(resolved_session_id),
+        )
+
+    def session_folder(self, *, session_id: str) -> SessionFolder:
+        resolved_session_id = self._require_session_id(session_id)
+        return SessionFolder(path=self._artifact_root_for_session_id(resolved_session_id))
+
     def close(self) -> None:
         self._connection.close()
 
@@ -186,6 +241,22 @@ class SessionRecorderService:
         if row is None:
             return None
         return str(row["id"])
+
+    def _require_session_id(self, session_id: str) -> str:
+        resolved_session_id = self._resolve_session_id(session_id)
+        if resolved_session_id is None or not self._session_exists(resolved_session_id):
+            raise ValueError(f"Unknown session: {session_id}")
+        return resolved_session_id
+
+    def _session_exists(self, session_id: str) -> bool:
+        row = self._connection.execute(
+            "SELECT 1 FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        return row is not None
+
+    def _evidence_ids_for_session(self, session_id: str) -> list[str]:
+        return [event.id for event in list_raw_events(self._connection, session_id)]
 
     def _active_process_name(self) -> str | None:
         try:
@@ -297,6 +368,13 @@ class RunningScreenshotWorker:
 class RunningFileWatcher:
     worker: FileWatcherWorker
     task: asyncio.Task[None]
+
+
+def _preview_text(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    if len(text) <= EXPORT_PREVIEW_MAX_CHARS:
+        return text
+    return f"{text[:EXPORT_PREVIEW_MAX_CHARS]}\n..."
 
 
 def map_session_error(error: SessionTransitionError) -> tuple[int, str]:

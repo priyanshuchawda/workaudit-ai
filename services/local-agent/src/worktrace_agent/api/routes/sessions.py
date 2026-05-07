@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from worktrace_agent.api.session_recorder_service import (
+    SessionExportPreview,
     SessionRecorderService,
     is_sqlite_missing_session_error,
     map_session_error,
@@ -96,6 +97,17 @@ class DeleteScreenshotsResponse(BaseModel):
     deleted_files: int
     missing_files: int
     deleted_rows: int
+
+
+class SessionExportResponse(BaseModel):
+    format: str
+    path: str
+    preview: str
+    evidence_ids: list[str]
+
+
+class SessionFolderResponse(BaseModel):
+    path: str
 
 
 @router.post("/start", response_model=SessionResponse)
@@ -235,6 +247,45 @@ async def delete_recording_session_screenshots(
     )
 
 
+@router.post("/{session_id}/exports/markdown", response_model=SessionExportResponse)
+async def export_recording_session_markdown(
+    session_id: str,
+    request: Request,
+) -> SessionExportResponse:
+    service = _session_service(request)
+    try:
+        export = service.export_session_markdown_preview(session_id=session_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return _session_export_response(export)
+
+
+@router.post("/{session_id}/exports/raw-json", response_model=SessionExportResponse)
+async def export_recording_session_raw_json(
+    session_id: str,
+    request: Request,
+) -> SessionExportResponse:
+    service = _session_service(request)
+    try:
+        export = service.export_session_raw_json_preview(session_id=session_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return _session_export_response(export)
+
+
+@router.get("/{session_id}/folder", response_model=SessionFolderResponse)
+async def get_recording_session_folder(
+    session_id: str,
+    request: Request,
+) -> SessionFolderResponse:
+    service = _session_service(request)
+    try:
+        folder = service.session_folder(session_id=session_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return SessionFolderResponse(path=folder.path.as_posix())
+
+
 def _session_service(request: Request) -> SessionRecorderService:
     return cast(SessionRecorderService, request.app.state.session_recorder_service)
 
@@ -278,4 +329,13 @@ def _screenshot_response(screenshot: ScreenshotArtifact) -> ScreenshotResponse:
         content_hash=screenshot.content_hash,
         visual_hash=screenshot.visual_hash,
         storage_path=screenshot.storage_path,
+    )
+
+
+def _session_export_response(export: SessionExportPreview) -> SessionExportResponse:
+    return SessionExportResponse(
+        format=export.format,
+        path=export.path.as_posix(),
+        preview=export.preview,
+        evidence_ids=export.evidence_ids,
     )

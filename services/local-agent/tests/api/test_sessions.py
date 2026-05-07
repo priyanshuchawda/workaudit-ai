@@ -321,6 +321,79 @@ def test_latest_session_events_returns_most_recent_session_events(tmp_path: Path
     assert events[0]["metadata"]["app"] == "VS Code"
 
 
+def test_export_session_markdown_and_raw_json_from_api(tmp_path: Path) -> None:
+    token = "ghp_" + "test"
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            recorder_poll_interval_seconds=0.01,
+        )
+    )
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_export_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+            "title": "API export",
+        },
+    )
+    client.post(
+        "/sessions/sess_api_export_001/terminal-events",
+        json={
+            "timestamp": "2026-05-06T09:14:30+05:30",
+            "command": f"pnpm test --token {token}",
+            "shell": "powershell",
+            "exit_code": 1,
+        },
+    )
+    client.post(
+        "/sessions/sess_api_export_001/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+
+    markdown_response = client.post("/sessions/sess_api_export_001/exports/markdown")
+    raw_json_response = client.post("/sessions/sess_api_export_001/exports/raw-json")
+    folder_response = client.get("/sessions/sess_api_export_001/folder")
+
+    assert markdown_response.status_code == 200
+    markdown = markdown_response.json()
+    assert markdown["format"] == "markdown"
+    assert markdown["path"].endswith("sessions/sess_api_export_001/exports/session.md")
+    assert (
+        "Deterministic export generated from local session evidence. No LLM was used."
+        in markdown["preview"]
+    )
+    assert markdown["evidence_ids"]
+    assert any(evidence_id in markdown["preview"] for evidence_id in markdown["evidence_ids"])
+    assert token not in markdown["preview"]
+
+    assert raw_json_response.status_code == 200
+    raw_json = raw_json_response.json()
+    assert raw_json["format"] == "raw_json"
+    assert raw_json["path"].endswith("sessions/sess_api_export_001/exports/session.raw.json")
+    assert '"events"' in raw_json["preview"]
+    assert token not in raw_json["preview"]
+
+    assert folder_response.status_code == 200
+    assert folder_response.json()["path"].endswith("sessions/sess_api_export_001")
+
+
+def test_export_unknown_session_returns_safe_error(tmp_path: Path) -> None:
+    client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
+
+    markdown_response = client.post("/sessions/sess_missing/exports/markdown")
+    raw_json_response = client.post("/sessions/sess_missing/exports/raw-json")
+    folder_response = client.get("/sessions/sess_missing/folder")
+
+    assert markdown_response.status_code == 404
+    assert markdown_response.json() == {"detail": "Unknown session: sess_missing"}
+    assert raw_json_response.status_code == 404
+    assert raw_json_response.json() == {"detail": "Unknown session: sess_missing"}
+    assert folder_response.status_code == 404
+    assert folder_response.json() == {"detail": "Unknown session: sess_missing"}
+
+
 def test_stop_unknown_session_returns_safe_error(tmp_path: Path) -> None:
     client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
 

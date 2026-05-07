@@ -64,6 +64,8 @@ MVP 4 now includes 20 compact golden sessions and a deterministic eval runner th
 
 MVP 4 now includes deterministic recording resource budget checks and a fake 30-minute recording budget simulation for CPU, RAM, DB growth, screenshot storage, and model-loaded policy. This is not yet real Windows capture profiling.
 
+MVP dashboard work now includes desktop-accessible deterministic Markdown and raw JSON export review through the configured local sidecar bridge. The desktop shows preview text, export paths, evidence IDs, safe unavailable/error states, session-folder lookup status, and an honest AI report unavailable state because no real local model runtime is integrated yet.
+
 ## Two-Minute Review
 
 WorkTrace AI is a local-first desktop recorder and evidence timeline project. The implemented repo currently proves the foundations: typed contracts, SQLite WAL migrations, fake session storage/export, a Tauri shell, sidecar health, deterministic timeline/export/report foundations, model fallback states, selective AI-worker contracts, workflow debugging rules, golden evals, and deterministic resource budget checks.
@@ -83,7 +85,8 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Active-window, screenshot, configured-folder file watcher, explicit terminal command ingestion, and desktop start/pause/resume/stop controls are wired through the Python sidecar. The Tauri recorder and event bridge still require a configured localhost sidecar URL or configured local sidecar binary/port; OCR and model runtimes are still not live.
 - Terminal command ingestion is manual/API-based only. It does not spy on terminals, keylog, or capture commands unless an explicit logger/hook posts them.
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
-- The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, and configured sidecar launch/stop handling, but desktop export commands, desktop screenshot metadata commands, and bundled sidecar packaging are not fully wired yet.
+- The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, and deterministic Markdown/raw JSON export review. Desktop screenshot metadata/delete UI, session deletion, and full session browser workflows are not fully wired yet.
+- The desktop AI report panel is intentionally unavailable. Real local LLM runtime integration and model downloads are not implemented.
 - Python sidecar packaging is not bundled into the installer yet.
 - Local model runtimes and model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.

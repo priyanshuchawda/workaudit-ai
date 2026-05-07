@@ -8,7 +8,10 @@ import {
   type RawTimelineEvent,
 } from "./features/timeline/raw-timeline-simulation";
 import {
+  exportSessionMarkdown,
+  exportSessionRawJson,
   getSessionEvents,
+  getSessionFolder,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -18,7 +21,10 @@ import {
   stopSidecar,
   type RecorderControlResult,
   type RecorderSession,
+  type SessionExportPreview,
+  type SessionExportResult,
   type SessionEventsResult,
+  type SessionFolderResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
@@ -59,6 +65,14 @@ type RecorderUiStatus =
 
 type EventFilter = "all" | RawTimelineEvent["source"];
 
+type ExportReviewState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; export: null }
+  | { status: "success"; message: string; export: SessionExportPreview };
+
+type FolderReviewState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; path: null }
+  | { status: "success"; message: string; path: string };
+
 const eventFilters: { label: string; value: EventFilter }[] = [
   { label: "All", value: "all" },
   { label: "Active windows", value: "active_window" },
@@ -80,6 +94,18 @@ const sidecarTone: Record<SidecarHealth["status"], string> = {
   missing: "border-amber-300 bg-amber-50 text-amber-950",
 };
 
+const initialExportReviewState: ExportReviewState = {
+  status: "idle",
+  message: "No export preview available yet.",
+  export: null,
+};
+
+const initialFolderReviewState: FolderReviewState = {
+  status: "idle",
+  message: "Session folder lookup has not run yet.",
+  path: null,
+};
+
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
@@ -87,6 +113,10 @@ function App() {
   const [recorderStatus, setRecorderStatus] = useState<RecorderUiStatus>("idle");
   const [recorderMessage, setRecorderMessage] = useState(initialRecorderMessage);
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [exportReview, setExportReview] =
+    useState<ExportReviewState>(initialExportReviewState);
+  const [folderReview, setFolderReview] =
+    useState<FolderReviewState>(initialFolderReviewState);
   const sourceEvents: RawTimelineEvent[] =
     sessionEvents.status === "available" ? sessionEvents.events : rawTimelineSimulationEvents;
   const timelineEvents =
@@ -96,6 +126,8 @@ function App() {
   const sessionEventCount = sourceEvents.length;
   const sourceStatusLabel =
     sessionEvents.status === "available" ? "Latest sidecar session" : "Fixture preview session";
+  const reviewSessionId =
+    recorderSession?.id ?? (sessionEvents.status === "available" ? "latest" : null);
 
   const refreshSidecarHealth = useCallback(async () => {
     setSidecarHealth(initialSidecarHealth);
@@ -183,6 +215,76 @@ function App() {
         stoppedAt: nowWithOffset(),
       }),
     );
+  };
+
+  const applyExportResult = (result: SessionExportResult) => {
+    if (result.status === "unavailable") {
+      setExportReview({
+        status: "unavailable",
+        message: result.message,
+        export: null,
+      });
+      return;
+    }
+
+    setExportReview({
+      status: "success",
+      message: result.message,
+      export: result.export,
+    });
+  };
+
+  const applyFolderResult = (result: SessionFolderResult) => {
+    if (result.status === "unavailable") {
+      setFolderReview({
+        status: "unavailable",
+        message: result.message,
+        path: null,
+      });
+      return;
+    }
+
+    setFolderReview({
+      status: "success",
+      message: result.message,
+      path: result.path,
+    });
+  };
+
+  const handleExportMarkdown = async () => {
+    if (!reviewSessionId) {
+      return;
+    }
+    setExportReview({
+      status: "loading",
+      message: "Generating Markdown export preview.",
+      export: null,
+    });
+    applyExportResult(await exportSessionMarkdown(reviewSessionId));
+  };
+
+  const handleExportRawJson = async () => {
+    if (!reviewSessionId) {
+      return;
+    }
+    setExportReview({
+      status: "loading",
+      message: "Generating raw JSON export preview.",
+      export: null,
+    });
+    applyExportResult(await exportSessionRawJson(reviewSessionId));
+  };
+
+  const handleOpenSessionFolder = async () => {
+    if (!reviewSessionId) {
+      return;
+    }
+    setFolderReview({
+      status: "loading",
+      message: "Checking session folder availability.",
+      path: null,
+    });
+    applyFolderResult(await getSessionFolder(reviewSessionId));
   };
 
   useEffect(() => {
@@ -376,23 +478,14 @@ function App() {
               </button>
             </section>
 
-            <section
-              aria-label="Export and retention"
-              className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
-            >
-              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
-                Export
-              </p>
-              <h2 className="mt-2 text-xl font-semibold tracking-normal">Export and retention</h2>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <UnavailableButton label="Export Markdown" />
-                <UnavailableButton label="Export raw JSON" />
-                <UnavailableButton label="Delete session" />
-              </div>
-              <p className="mt-3 text-sm leading-6 text-zinc-700">
-                Desktop export and session deletion commands are not wired yet.
-              </p>
-            </section>
+            <ExportReviewPanel
+              canReview={Boolean(reviewSessionId)}
+              exportState={exportReview}
+              folderState={folderReview}
+              onExportMarkdown={handleExportMarkdown}
+              onExportRawJson={handleExportRawJson}
+              onOpenSessionFolder={handleOpenSessionFolder}
+            />
 
             <section
               aria-label="Privacy status"
@@ -498,24 +591,122 @@ function RecorderControlPanel({
   );
 }
 
+function ExportReviewPanel({
+  canReview,
+  exportState,
+  folderState,
+  onExportMarkdown,
+  onExportRawJson,
+  onOpenSessionFolder,
+}: {
+  canReview: boolean;
+  exportState: ExportReviewState;
+  folderState: FolderReviewState;
+  onExportMarkdown: () => void;
+  onExportRawJson: () => void;
+  onOpenSessionFolder: () => void;
+}) {
+  const isExportBusy = exportState.status === "loading";
+  const isFolderBusy = folderState.status === "loading";
+  const controlsDisabled = !canReview || isExportBusy;
+  const folderDisabled = !canReview || isFolderBusy;
+
+  return (
+    <section
+      aria-label="Export and report review"
+      className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
+    >
+      <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Export</p>
+      <h2 className="mt-2 text-xl font-semibold tracking-normal">Export and report review</h2>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-70"
+          disabled={controlsDisabled}
+          onClick={onExportMarkdown}
+          type="button"
+        >
+          Export Markdown
+        </button>
+        <button
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-70"
+          disabled={controlsDisabled}
+          onClick={onExportRawJson}
+          type="button"
+        >
+          Export raw JSON
+        </button>
+        <button
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-70"
+          disabled={folderDisabled}
+          onClick={onOpenSessionFolder}
+          type="button"
+        >
+          Open session folder
+        </button>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-zinc-700">
+        {canReview
+          ? "Exports are deterministic local files generated from the configured sidecar session."
+          : "Connect to a live sidecar session before exporting from the desktop."}
+      </p>
+      <div
+        aria-live="polite"
+        className={`mt-4 rounded-md border p-3 text-sm ${
+          exportState.status === "unavailable"
+            ? "border-amber-300 bg-amber-50 text-amber-950"
+            : "border-zinc-200 bg-zinc-50 text-zinc-800"
+        }`}
+      >
+        <p className="font-semibold text-zinc-950">{exportState.message}</p>
+        {exportState.export ? (
+          <div className="mt-3 space-y-3">
+            <p className="break-all text-xs uppercase tracking-wide text-zinc-500">
+              {exportState.export.path}
+            </p>
+            {exportState.export.evidenceIds.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {exportState.export.evidenceIds.map((evidenceId) => (
+                  <span
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-semibold text-zinc-700"
+                    key={evidenceId}
+                  >
+                    {evidenceId}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-200 bg-white p-3 text-xs leading-5 text-zinc-800">
+              {exportState.export.preview}
+            </pre>
+          </div>
+        ) : (
+          <p className="mt-2 text-zinc-700">No export preview available yet.</p>
+        )}
+      </div>
+      <div
+        aria-live="polite"
+        className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-800"
+      >
+        <p className="font-semibold text-zinc-950">{folderState.message}</p>
+        {folderState.path ? <p className="mt-2 break-all text-zinc-700">{folderState.path}</p> : null}
+      </div>
+      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        <h3 className="font-semibold tracking-normal">AI report unavailable</h3>
+        <p className="mt-2 leading-6">
+          Real local LLM report generation is not wired into the desktop yet. Use deterministic
+          Markdown or raw JSON export for review.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
       <p className="mt-2 text-xl font-semibold tracking-normal text-zinc-950">{value}</p>
     </div>
-  );
-}
-
-function UnavailableButton({ label }: { label: string }) {
-  return (
-    <button
-      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-500 disabled:cursor-not-allowed disabled:opacity-70"
-      disabled
-      type="button"
-    >
-      {label}
-    </button>
   );
 }
 

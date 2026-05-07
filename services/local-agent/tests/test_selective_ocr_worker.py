@@ -212,6 +212,52 @@ def test_ocr_result_metadata_includes_screenshot_evidence_id() -> None:
     assert decision.result.metadata["evidence_ids"] == [screenshot.id]
 
 
+def test_session_ocr_job_cap_skips_after_limit() -> None:
+    worker = SelectiveOcrWorker(max_jobs_per_session=1)
+    engine = FakeOcrEngine(OcrEngineResult(text="Traceback: AssertionError", confidence=0.9))
+    first = build_screenshot("shot_cap_001", visual_hash="cap-001")
+    second = build_screenshot("shot_cap_002", visual_hash="cap-002")
+
+    first_decision = worker.process_candidate(
+        OcrCandidate(
+            screenshot=first,
+            image_bytes=b"first",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=engine,
+    )
+    second_decision = worker.process_candidate(
+        OcrCandidate(
+            screenshot=second,
+            image_bytes=b"second",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=engine,
+    )
+
+    assert first_decision.result is not None
+    assert second_decision.result is None
+    assert second_decision.skipped is OcrSkipReason.SESSION_LIMIT
+    assert engine.call_count == 1
+
+
+def test_engine_failure_is_skipped_safely_without_result() -> None:
+    decision = SelectiveOcrWorker().process_candidate(
+        OcrCandidate(
+            screenshot=build_screenshot("shot_runtime_failed", visual_hash="runtime-failed"),
+            image_bytes=b"runtime-failed",
+            app_name="Windows Terminal",
+            window_title="pytest traceback",
+        ),
+        engine=RaisingOcrEngine(),
+    )
+
+    assert decision.result is None
+    assert decision.skipped is OcrSkipReason.RUNTIME_FAILED
+
+
 def test_ocr_results_table_exists_after_migrations(tmp_path: Path) -> None:
     connection = initialize_database(tmp_path / "worktrace.sqlite")
     try:
@@ -234,6 +280,13 @@ class FakeOcrEngine:
     def recognize(self, candidate: OcrCandidate) -> OcrEngineResult:
         self.call_count += 1
         return self.result
+
+
+class RaisingOcrEngine:
+    engine_name = "raising-ocr"
+
+    def recognize(self, candidate: OcrCandidate) -> OcrEngineResult:
+        raise RuntimeError("ocr failed")
 
 
 def build_screenshot(screenshot_id: str, *, visual_hash: str) -> ScreenshotArtifact:

@@ -21,6 +21,8 @@ For #89, WorkTrace can manually install a user-supplied local model file into th
 
 For #91, WorkTrace adds a localhost-only Qwen3 embedding runtime adapter for retrieval/grouping helpers. The adapter redacts text before transport, validates response dimensions, and can be fully tested with fake transport. It still does not run during recording, does not auto-download models, and does not allow embeddings to bypass evidence-ID claim discipline.
 
+For #93, WorkTrace adds an optional real PaddleOCR adapter path behind selective-worker guardrails. Runtime binding is lazy, unavailable runtimes degrade safely, and per-session OCR jobs are capped so OCR cannot become continuous capture.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

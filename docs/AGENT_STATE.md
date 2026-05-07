@@ -1,18 +1,33 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 00:35 local / 2026-05-07 19:05 UTC
+2026-05-08 01:13 local / 2026-05-07 19:43 UTC
 
 ## Current Issue
-#91 — Embedding runtime: Qwen3-Embedding-0.6B
+#93 — Real PaddleOCR adapter
 
 ## Current Branch
-feat/91-qwen-embedding-runtime-v2
+feat/93-real-paddleocr-adapter
 
 ## Current Phase
-Final diff review and PR preparation for #91
+PR preparation for #93 after full quality gate
 
 ## Completed Since Last Update
+- Added #93 regression coverage for the documented PaddleOCR `predict()` API, PP-OCR constructor options, and `rec_texts`/`rec_scores` output parsing from `docs/pp_ocr.md`.
+- Updated the PaddleOCR adapter to use the documented `predict()` path, support current `rec_texts`/`rec_scores` and older tuple result shapes, and keep temporary screenshot files cleaned up safely.
+- Confirmed PaddleOCR is not installed in this local environment with a lightweight `importlib.util.find_spec("paddleocr")` check, so no real OCR smoke was run.
+- Focused #93 checks now pass:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py tests/test_ocr_runtime.py tests/test_selective_ocr_worker.py -q` (24 passed)
+- Full #93 quality gate passed across Python, shared, desktop, and Rust.
+- Added red tests for #93 in `tests/test_ocr_runtime.py` and `tests/test_selective_ocr_worker.py` covering runtime binding fallback, fake Paddle recognizer parsing, per-session OCR cap, and safe runtime-failure skip.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_ocr_runtime.py tests/test_selective_ocr_worker.py -q` failing on missing `build_paddle_ocr_engine`.
+- Merged #91 via PR #92 and confirmed the issue is closed.
+- Created #93: Real PaddleOCR adapter.
+- Started branch `feat/93-real-paddleocr-adapter` from updated `main`.
+- Wrote implementation plan at `docs/superpowers/plans/2026-05-08-real-paddleocr-adapter.md`.
 - Full #91 quality gate passed after implementation updates:
   - `uv run --python 3.13 ruff format .`
   - `uv run --python 3.13 ruff check .`
@@ -123,13 +138,15 @@ Final diff review and PR preparation for #91
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
-- `.gitignore`
 - `README.md`
-- `docs/models/model_download_policy.md`
+- `docs/model-routing.md`
 - `docs/models/local_model_runtime.md`
-- `docs/superpowers/plans/2026-05-07-real-model-download-manager.md`
-- `services/local-agent/src/worktrace_agent/ai/model_cache.py`
-- `services/local-agent/tests/test_model_cache.py`
+- `docs/models/ocr.md`
+- `docs/superpowers/plans/2026-05-08-real-paddleocr-adapter.md`
+- `services/local-agent/src/worktrace_agent/capture/ocr_runtime.py`
+- `services/local-agent/src/worktrace_agent/capture/ocr_worker.py`
+- `services/local-agent/tests/test_ocr_runtime.py`
+- `services/local-agent/tests/test_selective_ocr_worker.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -274,17 +291,33 @@ Final diff review and PR preparation for #91
 - `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_ocr_runtime.py tests/test_selective_ocr_worker.py -q` — passed, 18 tests after switching the adapter to PaddleOCR `predict()` and documented response parsing.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py tests/test_ocr_runtime.py tests/test_selective_ocr_worker.py -q` — passed, 24 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — passed.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 221 tests.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed, 14 tests.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop test` — passed, 28 tests.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
+- `git diff --check` — passed.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #89 does not change sidecar packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #89 does not change installer packaging.
-- Real network model download smoke — not run; #89 intentionally implements only manual local-file install/uninstall, not a network downloader.
+- `pnpm --dir apps/desktop package:sidecar` — not run; #93 does not change sidecar packaging.
+- `pnpm --dir apps/desktop package:windows` — not run; #93 does not change installer packaging.
+- Real PaddleOCR smoke — not run; `importlib.util.find_spec("paddleocr")` returned `False` in this environment, and this PR does not install/download OCR packages or model files.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run final diff/whitespace checks, stage scoped #89 files, commit, push, and open PR.
+Stage scoped #93 files, commit, push, and open PR.
 
 ## Do Not Forget
 - No OCR before OCR issue.

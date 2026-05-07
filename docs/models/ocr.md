@@ -12,6 +12,9 @@ Current #79 policy:
 - OCR output is evidence, not an autonomous claim. Reports must still cite source events/screenshots.
 - Continuous OCR of every screenshot is forbidden.
 - No OCR model files are committed to git.
-- Real PaddleOCR integration is optional for this issue and must degrade to unavailable if the runtime is absent.
+- Real PaddleOCR integration is optional and must degrade to unavailable if the runtime is absent.
+- Real PaddleOCR binding must be lazy and local-only, with no heavy imports in non-OCR recording paths.
+- Selective OCR must cap jobs per session to avoid continuous OCR behavior.
+- Runtime failures must fail safely and skip the candidate.
 
 The default runtime state should be disabled/unavailable unless explicitly configured.

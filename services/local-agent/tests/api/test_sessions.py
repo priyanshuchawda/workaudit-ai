@@ -79,6 +79,48 @@ def test_start_stop_and_list_session_events(tmp_path: Path) -> None:
     assert events[0]["metadata"]["app"] == "VS Code"
 
 
+def test_start_pause_resume_stop_session_control_flow(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            recorder_poll_interval_seconds=0.01,
+            screenshot_interval_seconds=0.01,
+        )
+    )
+
+    start_response = client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_control_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+            "title": "Desktop control flow",
+            "privacy_mode": "standard",
+        },
+    )
+    pause_response = client.post(
+        "/sessions/sess_api_control_001/pause",
+        json={"paused_at": "2026-05-06T09:15:00+05:30"},
+    )
+    resume_response = client.post(
+        "/sessions/sess_api_control_001/resume",
+        json={"resumed_at": "2026-05-06T09:16:00+05:30"},
+    )
+    stop_response = client.post(
+        "/sessions/sess_api_control_001/stop",
+        json={"stopped_at": "2026-05-06T09:17:00+05:30"},
+    )
+
+    assert start_response.status_code == 200
+    assert start_response.json()["status"] == "recording"
+    assert pause_response.status_code == 200
+    assert pause_response.json()["status"] == "paused"
+    assert resume_response.status_code == 200
+    assert resume_response.json()["status"] == "recording"
+    assert stop_response.status_code == 200
+    assert stop_response.json()["status"] == "stopped"
+
+
 def test_session_start_stops_file_watcher_when_roots_are_configured(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     file_path = project_root / "src" / "app.py"
@@ -257,3 +299,21 @@ def test_stop_unknown_session_returns_safe_error(tmp_path: Path) -> None:
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Unknown session: sess_missing"}
+
+
+def test_pause_and_resume_unknown_session_returns_safe_error(tmp_path: Path) -> None:
+    client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
+
+    pause_response = client.post(
+        "/sessions/sess_missing/pause",
+        json={"paused_at": "2026-05-06T09:15:00+05:30"},
+    )
+    resume_response = client.post(
+        "/sessions/sess_missing/resume",
+        json={"resumed_at": "2026-05-06T09:16:00+05:30"},
+    )
+
+    assert pause_response.status_code == 409
+    assert pause_response.json() == {"detail": "Unknown session: sess_missing"}
+    assert resume_response.status_code == 409
+    assert resume_response.json() == {"detail": "Unknown session: sess_missing"}

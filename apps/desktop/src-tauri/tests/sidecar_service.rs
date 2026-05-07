@@ -3,9 +3,12 @@ use std::{
     net::TcpListener,
     thread,
 };
-use worktrace_desktop_lib::commands::sidecar::get_session_events;
+use worktrace_desktop_lib::commands::sidecar::{
+    get_session_events, pause_recording_session, resume_recording_session, start_recording_session,
+    stop_recording_session,
+};
 use worktrace_desktop_lib::services::sidecar::{
-    SessionEventsStatus, SidecarService, SidecarStatus,
+    RecorderControlStatus, SessionEventsStatus, SidecarService, SidecarStatus,
 };
 
 #[test]
@@ -62,6 +65,115 @@ fn command_exposes_safe_session_events_fallback() {
 
     assert_eq!(result.status, SessionEventsStatus::Unavailable);
     assert!(result.events.is_empty());
+}
+
+#[test]
+fn recorder_control_commands_return_safe_unavailable_state_when_bridge_is_missing() {
+    let start = start_recording_session(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:14:00+05:30".to_string(),
+        Some("Desktop control".to_string()),
+        "standard".to_string(),
+    );
+    let pause = pause_recording_session(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:15:00+05:30".to_string(),
+    );
+    let resume = resume_recording_session(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:16:00+05:30".to_string(),
+    );
+    let stop = stop_recording_session(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:17:00+05:30".to_string(),
+    );
+
+    assert_eq!(start.status, RecorderControlStatus::Unavailable);
+    assert_eq!(pause.status, RecorderControlStatus::Unavailable);
+    assert_eq!(resume.status, RecorderControlStatus::Unavailable);
+    assert_eq!(stop.status, RecorderControlStatus::Unavailable);
+    assert!(start.session.is_none());
+}
+
+#[test]
+fn recorder_controls_post_to_local_sidecar_and_return_session_state() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        let expected_paths = [
+            "POST /sessions/start HTTP/1.1",
+            "POST /sessions/sess_control_001/pause HTTP/1.1",
+            "POST /sessions/sess_control_001/resume HTTP/1.1",
+            "POST /sessions/sess_control_001/stop HTTP/1.1",
+        ];
+        let statuses = ["recording", "paused", "recording", "stopped"];
+
+        for (index, expected_path) in expected_paths.iter().enumerate() {
+            let (mut stream, _) = listener.accept().expect("accept sidecar request");
+            let mut request = [0_u8; 2048];
+            let read_count = stream.read(&mut request).expect("read sidecar request");
+            let request_text = String::from_utf8_lossy(&request[..read_count]);
+            assert!(request_text.starts_with(expected_path));
+            assert!(request_text.contains("Content-Type: application/json"));
+
+            let body = format!(
+                r#"{{"id":"sess_control_001","started_at":"2026-05-06T09:14:00+05:30","ended_at":null,"status":"{}","title":"Desktop control","storage_path":null,"privacy_mode":"standard"}}"#,
+                statuses[index]
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        }
+    });
+
+    let service = SidecarService;
+    let base_url = format!("http://127.0.0.1:{port}");
+    let start = service.start_recording_session_from_base_url(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:14:00+05:30".to_string(),
+        Some("Desktop control".to_string()),
+        "standard".to_string(),
+        &base_url,
+    );
+    let pause = service.pause_recording_session_from_base_url(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:15:00+05:30".to_string(),
+        &base_url,
+    );
+    let resume = service.resume_recording_session_from_base_url(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:16:00+05:30".to_string(),
+        &base_url,
+    );
+    let stop = service.stop_recording_session_from_base_url(
+        "sess_control_001".to_string(),
+        "2026-05-06T09:17:00+05:30".to_string(),
+        &base_url,
+    );
+    handle.join().expect("join local server");
+
+    assert_eq!(start.status, RecorderControlStatus::Available);
+    assert_eq!(
+        start.session.as_ref().expect("start session").status,
+        "recording"
+    );
+    assert_eq!(
+        pause.session.as_ref().expect("pause session").status,
+        "paused"
+    );
+    assert_eq!(
+        resume.session.as_ref().expect("resume session").status,
+        "recording"
+    );
+    assert_eq!(
+        stop.session.as_ref().expect("stop session").status,
+        "stopped"
+    );
 }
 
 #[test]

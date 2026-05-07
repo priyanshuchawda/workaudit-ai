@@ -20,7 +20,7 @@ from worktrace_agent.capture.screenshot_capture import (
     ScreenshotProvider,
     WindowsScreenshotProvider,
 )
-from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact
+from worktrace_agent.capture.screenshot_sampler import ScreenshotArtifact, ScreenshotSampler
 from worktrace_agent.capture.terminal_command_detector import normalize_terminal_command
 from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.raw_events_repository import append_raw_event, list_raw_events
@@ -31,6 +31,8 @@ from worktrace_agent.db.screenshots_repository import (
 )
 from worktrace_agent.db.session_state_repository import (
     SessionTransitionError,
+    pause_session,
+    resume_session,
     start_session,
     stop_session,
 )
@@ -66,6 +68,7 @@ class SessionRecorderService:
         self._file_watch_interval_seconds = file_watch_interval_seconds
         self._running_recorders: dict[str, RunningRecorder] = {}
         self._running_screenshot_workers: dict[str, RunningScreenshotWorker] = {}
+        self._screenshot_samplers: dict[str, ScreenshotSampler] = {}
         self._running_file_watchers: dict[str, RunningFileWatcher] = {}
         self._lock = asyncio.Lock()
 
@@ -88,71 +91,38 @@ class SessionRecorderService:
                 storage_path=storage_path,
                 privacy_mode=privacy_mode,
             )
-            if session_id not in self._running_recorders:
-                recorder = ActiveWindowRecorder(
-                    connection=self._connection,
-                    session_id=session_id,
-                    provider=self._active_window_provider,
-                    poll_interval_seconds=self._recorder_poll_interval_seconds,
-                )
-                recorder.poll_once()
-                self._running_recorders[session_id] = RunningRecorder(
-                    recorder=recorder,
-                    task=asyncio.create_task(recorder.run()),
-                )
-            if session_id not in self._running_screenshot_workers:
-                screenshot_worker = ScreenshotCaptureWorker(
-                    connection=self._connection,
-                    session_id=session_id,
-                    artifact_root=self._artifact_root_for_session(session),
-                    provider=self._screenshot_provider,
-                    interval_seconds=self._screenshot_interval_seconds,
-                )
-                active_process_name = self._active_process_name()
-                screenshot_worker.poll_once(active_process_name=active_process_name)
-                self._running_screenshot_workers[session_id] = RunningScreenshotWorker(
-                    worker=screenshot_worker,
-                    task=asyncio.create_task(
-                        screenshot_worker.run(
-                            active_process_name_provider=self._active_process_name,
-                        )
-                    ),
-                )
-            roots = [Path(root) for root in file_watch_roots or [] if root.strip()]
-            if roots and session_id not in self._running_file_watchers:
-                file_watcher = FileWatcherWorker(
-                    connection=self._connection,
-                    session_id=session_id,
-                    roots=roots,
-                    provider=self._file_snapshot_provider,
-                    interval_seconds=self._file_watch_interval_seconds,
-                )
-                file_watcher.poll_once()
-                self._running_file_watchers[session_id] = RunningFileWatcher(
-                    worker=file_watcher,
-                    task=asyncio.create_task(file_watcher.run()),
-                )
+            self._start_workers_for_session(session, file_watch_roots=file_watch_roots)
+            return session
+
+    async def pause_recording_session(self, *, session_id: str, paused_at: str) -> SessionRecord:
+        async with self._lock:
+            session = pause_session(
+                self._connection,
+                session_id=session_id,
+                occurred_at=paused_at,
+            )
+            await self._stop_workers_for_session(session_id)
+            return session
+
+    async def resume_recording_session(
+        self,
+        *,
+        session_id: str,
+        resumed_at: str,
+        file_watch_roots: list[str] | None = None,
+    ) -> SessionRecord:
+        async with self._lock:
+            session = resume_session(
+                self._connection,
+                session_id=session_id,
+                occurred_at=resumed_at,
+            )
+            self._start_workers_for_session(session, file_watch_roots=file_watch_roots)
             return session
 
     async def stop_recording_session(self, *, session_id: str, stopped_at: str) -> SessionRecord:
         async with self._lock:
-            running_file_watcher = self._running_file_watchers.pop(session_id, None)
-            if running_file_watcher is not None:
-                await running_file_watcher.worker.stop()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await running_file_watcher.task
-
-            running_screenshots = self._running_screenshot_workers.pop(session_id, None)
-            if running_screenshots is not None:
-                await running_screenshots.worker.stop()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await running_screenshots.task
-
-            running = self._running_recorders.pop(session_id, None)
-            if running is not None:
-                await running.recorder.stop()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await running.task
+            await self._stop_workers_for_session(session_id)
             return stop_session(
                 self._connection,
                 session_id=session_id,
@@ -224,6 +194,78 @@ class SessionRecorderService:
         if snapshot is None:
             return None
         return snapshot.process_name
+
+    def _start_workers_for_session(
+        self,
+        session: SessionRecord,
+        *,
+        file_watch_roots: list[str] | None,
+    ) -> None:
+        session_id = session.id
+        if session_id not in self._running_recorders:
+            recorder = ActiveWindowRecorder(
+                connection=self._connection,
+                session_id=session_id,
+                provider=self._active_window_provider,
+                poll_interval_seconds=self._recorder_poll_interval_seconds,
+            )
+            recorder.poll_once()
+            self._running_recorders[session_id] = RunningRecorder(
+                recorder=recorder,
+                task=asyncio.create_task(recorder.run()),
+            )
+        if session_id not in self._running_screenshot_workers:
+            screenshot_worker = ScreenshotCaptureWorker(
+                connection=self._connection,
+                session_id=session_id,
+                artifact_root=self._artifact_root_for_session(session),
+                provider=self._screenshot_provider,
+                sampler=self._screenshot_samplers.setdefault(session_id, ScreenshotSampler()),
+                interval_seconds=self._screenshot_interval_seconds,
+            )
+            active_process_name = self._active_process_name()
+            screenshot_worker.poll_once(active_process_name=active_process_name)
+            self._running_screenshot_workers[session_id] = RunningScreenshotWorker(
+                worker=screenshot_worker,
+                task=asyncio.create_task(
+                    screenshot_worker.run(
+                        active_process_name_provider=self._active_process_name,
+                    )
+                ),
+            )
+        roots = [Path(root) for root in file_watch_roots or [] if root.strip()]
+        if roots and session_id not in self._running_file_watchers:
+            file_watcher = FileWatcherWorker(
+                connection=self._connection,
+                session_id=session_id,
+                roots=roots,
+                provider=self._file_snapshot_provider,
+                interval_seconds=self._file_watch_interval_seconds,
+            )
+            file_watcher.poll_once()
+            self._running_file_watchers[session_id] = RunningFileWatcher(
+                worker=file_watcher,
+                task=asyncio.create_task(file_watcher.run()),
+            )
+
+    async def _stop_workers_for_session(self, session_id: str) -> None:
+        running_file_watcher = self._running_file_watchers.pop(session_id, None)
+        if running_file_watcher is not None:
+            await running_file_watcher.worker.stop()
+            with contextlib.suppress(asyncio.CancelledError):
+                await running_file_watcher.task
+
+        running_screenshots = self._running_screenshot_workers.pop(session_id, None)
+        if running_screenshots is not None:
+            await running_screenshots.worker.stop()
+            with contextlib.suppress(asyncio.CancelledError):
+                await running_screenshots.task
+
+        running = self._running_recorders.pop(session_id, None)
+        if running is not None:
+            await running.recorder.stop()
+            with contextlib.suppress(asyncio.CancelledError):
+                await running.task
 
     def _artifact_root_for_session(self, session: SessionRecord) -> Path:
         if session.storage_path:

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{
     env,
     io::{Read, Write},
@@ -68,6 +68,33 @@ pub struct SessionTimelineEvent {
     pub event_type: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecorderControlStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct RecorderSession {
+    pub id: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub status: String,
+    pub title: Option<String>,
+    pub storage_path: Option<String>,
+    pub privacy_mode: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecorderControlResult {
+    pub status: RecorderControlStatus,
+    pub message: String,
+    pub session: Option<RecorderSession>,
+}
+
 #[derive(Debug, Deserialize)]
 struct SidecarEventsResponse {
     events: Vec<SidecarRawEvent>,
@@ -107,6 +134,144 @@ impl SidecarService {
         self.events_from_base_url(session_id, &base_url)
     }
 
+    pub fn start_recording_session(
+        &self,
+        session_id: String,
+        started_at: String,
+        title: Option<String>,
+        privacy_mode: String,
+    ) -> RecorderControlResult {
+        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+            return unavailable_recorder_control();
+        };
+
+        self.start_recording_session_from_base_url(
+            session_id,
+            started_at,
+            title,
+            privacy_mode,
+            &base_url,
+        )
+    }
+
+    pub fn start_recording_session_from_base_url(
+        &self,
+        session_id: String,
+        started_at: String,
+        title: Option<String>,
+        privacy_mode: String,
+        base_url: &str,
+    ) -> RecorderControlResult {
+        if session_id.trim().is_empty()
+            || started_at.trim().is_empty()
+            || privacy_mode.trim().is_empty()
+        {
+            return unavailable_recorder_control();
+        }
+
+        self.post_session_control(
+            base_url,
+            "/sessions/start".to_string(),
+            json!({
+                "session_id": session_id,
+                "started_at": started_at,
+                "title": title,
+                "privacy_mode": privacy_mode,
+            }),
+            "Recording session started.",
+        )
+    }
+
+    pub fn pause_recording_session(
+        &self,
+        session_id: String,
+        paused_at: String,
+    ) -> RecorderControlResult {
+        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+            return unavailable_recorder_control();
+        };
+
+        self.pause_recording_session_from_base_url(session_id, paused_at, &base_url)
+    }
+
+    pub fn pause_recording_session_from_base_url(
+        &self,
+        session_id: String,
+        paused_at: String,
+        base_url: &str,
+    ) -> RecorderControlResult {
+        if session_id.trim().is_empty() || paused_at.trim().is_empty() {
+            return unavailable_recorder_control();
+        }
+
+        self.post_session_control(
+            base_url,
+            format!("/sessions/{}/pause", encode_path_segment(&session_id)),
+            json!({ "paused_at": paused_at }),
+            "Recording session paused.",
+        )
+    }
+
+    pub fn resume_recording_session(
+        &self,
+        session_id: String,
+        resumed_at: String,
+    ) -> RecorderControlResult {
+        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+            return unavailable_recorder_control();
+        };
+
+        self.resume_recording_session_from_base_url(session_id, resumed_at, &base_url)
+    }
+
+    pub fn resume_recording_session_from_base_url(
+        &self,
+        session_id: String,
+        resumed_at: String,
+        base_url: &str,
+    ) -> RecorderControlResult {
+        if session_id.trim().is_empty() || resumed_at.trim().is_empty() {
+            return unavailable_recorder_control();
+        }
+
+        self.post_session_control(
+            base_url,
+            format!("/sessions/{}/resume", encode_path_segment(&session_id)),
+            json!({ "resumed_at": resumed_at }),
+            "Recording session resumed.",
+        )
+    }
+
+    pub fn stop_recording_session(
+        &self,
+        session_id: String,
+        stopped_at: String,
+    ) -> RecorderControlResult {
+        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+            return unavailable_recorder_control();
+        };
+
+        self.stop_recording_session_from_base_url(session_id, stopped_at, &base_url)
+    }
+
+    pub fn stop_recording_session_from_base_url(
+        &self,
+        session_id: String,
+        stopped_at: String,
+        base_url: &str,
+    ) -> RecorderControlResult {
+        if session_id.trim().is_empty() || stopped_at.trim().is_empty() {
+            return unavailable_recorder_control();
+        }
+
+        self.post_session_control(
+            base_url,
+            format!("/sessions/{}/stop", encode_path_segment(&session_id)),
+            json!({ "stopped_at": stopped_at }),
+            "Recording session stopped.",
+        )
+    }
+
     pub fn events_from_base_url(&self, session_id: String, base_url: &str) -> SessionEventsResult {
         if session_id.trim().is_empty() {
             return unavailable_events();
@@ -117,7 +282,7 @@ impl SidecarService {
         };
 
         let path = format!("/sessions/{}/events", encode_path_segment(&session_id));
-        let Ok(body) = fetch_local_json(&endpoint, &path) else {
+        let Ok(body) = request_local_json(&endpoint, "GET", &path, None) else {
             return unavailable_events();
         };
 
@@ -135,6 +300,30 @@ impl SidecarService {
                 .collect(),
         }
     }
+
+    fn post_session_control(
+        &self,
+        base_url: &str,
+        path: String,
+        body: Value,
+        message: &str,
+    ) -> RecorderControlResult {
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_recorder_control();
+        };
+        let Ok(body_text) = request_local_json(&endpoint, "POST", &path, Some(body)) else {
+            return unavailable_recorder_control();
+        };
+        let Ok(session) = serde_json::from_str::<RecorderSession>(&body_text) else {
+            return unavailable_recorder_control();
+        };
+
+        RecorderControlResult {
+            status: RecorderControlStatus::Available,
+            message: message.to_string(),
+            session: Some(session.redacted()),
+        }
+    }
 }
 
 fn missing_health(message: &str) -> SidecarHealth {
@@ -150,6 +339,28 @@ fn unavailable_events() -> SessionEventsResult {
     SessionEventsResult {
         status: SessionEventsStatus::Unavailable,
         events: Vec::new(),
+    }
+}
+
+fn unavailable_recorder_control() -> RecorderControlResult {
+    RecorderControlResult {
+        status: RecorderControlStatus::Unavailable,
+        message: "Recorder sidecar bridge is unavailable.".to_string(),
+        session: None,
+    }
+}
+
+impl RecorderSession {
+    fn redacted(self) -> Self {
+        Self {
+            id: redact_text(&self.id),
+            started_at: redact_text(&self.started_at),
+            ended_at: self.ended_at.map(|ended_at| redact_text(&ended_at)),
+            status: redact_text(&self.status),
+            title: self.title.map(|title| redact_text(&title)),
+            storage_path: self.storage_path.map(|path| redact_text(&path)),
+            privacy_mode: redact_text(&self.privacy_mode),
+        }
     }
 }
 
@@ -253,7 +464,12 @@ impl LocalHttpEndpoint {
     }
 }
 
-fn fetch_local_json(endpoint: &LocalHttpEndpoint, path: &str) -> Result<String, ()> {
+fn request_local_json(
+    endpoint: &LocalHttpEndpoint,
+    method: &str,
+    path: &str,
+    body: Option<Value>,
+) -> Result<String, ()> {
     let address = (endpoint.host.as_str(), endpoint.port)
         .to_socket_addrs()
         .map_err(|_| ())?
@@ -266,10 +482,20 @@ fn fetch_local_json(endpoint: &LocalHttpEndpoint, path: &str) -> Result<String, 
     stream
         .set_write_timeout(Some(HTTP_TIMEOUT))
         .map_err(|_| ())?;
-    let request = format!(
-        "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept: application/json\r\n\r\n",
-        endpoint.host
-    );
+    let body_text = body.map(|value| value.to_string()).unwrap_or_default();
+    let request = if body_text.is_empty() {
+        format!(
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept: application/json\r\n\r\n",
+            endpoint.host
+        )
+    } else {
+        format!(
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            endpoint.host,
+            body_text.len(),
+            body_text
+        )
+    };
     stream.write_all(request.as_bytes()).map_err(|_| ())?;
 
     let mut response = String::new();

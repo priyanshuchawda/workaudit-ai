@@ -22,14 +22,18 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "## Evidence and Verification" in readme
     assert "## Current Limitations" in readme
     assert "desktop session dashboard foundation" in readme
+    assert "desktop recorder lifecycle controls for a configured local sidecar" in readme
     assert "real Windows active-window polling" in readme
-    assert "Tauri event bridge requires a configured localhost sidecar URL" in readme
+    assert (
+        "Tauri recorder and event bridge still require a configured localhost sidecar URL" in readme
+    )
     assert "real Windows screenshot capture" in readme
     assert "metadata-only file watcher capture" in readme
     assert "explicit safe terminal command ingestion" in readme
     assert "OCR and model runtimes are still not live" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "desktop export commands" in readme
+    assert "packaged sidecar launch" in readme
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme
 

@@ -32,6 +32,15 @@ class StopSessionRequest(BaseModel):
     stopped_at: str = Field(min_length=1)
 
 
+class PauseSessionRequest(BaseModel):
+    paused_at: str = Field(min_length=1)
+
+
+class ResumeSessionRequest(BaseModel):
+    resumed_at: str = Field(min_length=1)
+    file_watch_roots: list[str] = Field(default_factory=list)
+
+
 class TerminalCommandEventRequest(BaseModel):
     timestamp: str = Field(min_length=1)
     command: str = Field(min_length=1)
@@ -102,6 +111,43 @@ async def start_recording_session(
             title=request_body.title,
             storage_path=request_body.storage_path,
             privacy_mode=request_body.privacy_mode,
+            file_watch_roots=request_body.file_watch_roots,
+        )
+    except SessionTransitionError as error:
+        status_code, detail = map_session_error(error)
+        raise HTTPException(status_code=status_code, detail=detail) from error
+    return _session_response(session)
+
+
+@router.post("/{session_id}/pause", response_model=SessionResponse)
+async def pause_recording_session(
+    session_id: str,
+    request_body: PauseSessionRequest,
+    request: Request,
+) -> SessionResponse:
+    service = _session_service(request)
+    try:
+        session = await service.pause_recording_session(
+            session_id=session_id,
+            paused_at=request_body.paused_at,
+        )
+    except SessionTransitionError as error:
+        status_code, detail = map_session_error(error)
+        raise HTTPException(status_code=status_code, detail=detail) from error
+    return _session_response(session)
+
+
+@router.post("/{session_id}/resume", response_model=SessionResponse)
+async def resume_recording_session(
+    session_id: str,
+    request_body: ResumeSessionRequest,
+    request: Request,
+) -> SessionResponse:
+    service = _session_service(request)
+    try:
+        session = await service.resume_recording_session(
+            session_id=session_id,
+            resumed_at=request_body.resumed_at,
             file_watch_roots=request_body.file_watch_roots,
         )
     except SessionTransitionError as error:

@@ -7,6 +7,7 @@ from worktrace_agent.db.session_state_repository import (
     SessionTransitionError,
     interrupt_session,
     pause_session,
+    resume_session,
     start_session,
     stop_session,
 )
@@ -63,6 +64,28 @@ def test_pause_and_stop_session_persist_transitions(tmp_path: Path) -> None:
         assert row["status"] == "stopped"
         assert row["started_at"] == STARTED_AT
         assert row["ended_at"] == STOPPED_AT
+    finally:
+        connection.close()
+
+
+def test_resume_session_persists_recording_status_without_ending_session(tmp_path: Path) -> None:
+    connection = initialize_database(tmp_path / "worktrace.sqlite")
+    try:
+        start_session(connection, session_id="sess_state_001", started_at=STARTED_AT)
+        pause_session(connection, session_id="sess_state_001", occurred_at=PAUSED_AT)
+
+        resumed = resume_session(connection, session_id="sess_state_001", occurred_at=PAUSED_AT)
+
+        row = connection.execute(
+            "SELECT status, started_at, ended_at FROM sessions WHERE id = ?",
+            ("sess_state_001",),
+        ).fetchone()
+
+        assert resumed.status is SessionStatus.RECORDING
+        assert resumed.ended_at is None
+        assert row["status"] == "recording"
+        assert row["started_at"] == STARTED_AT
+        assert row["ended_at"] is None
     finally:
         connection.close()
 
@@ -153,6 +176,9 @@ def test_invalid_transitions_are_rejected(tmp_path: Path) -> None:
 
         with pytest.raises(SessionTransitionError, match="Cannot pause"):
             pause_session(connection, session_id="sess_state_001", occurred_at=PAUSED_AT)
+
+        with pytest.raises(SessionTransitionError, match="Cannot resume"):
+            resume_session(connection, session_id="sess_state_001", occurred_at=PAUSED_AT)
 
         with pytest.raises(SessionTransitionError, match="Cannot start"):
             start_session(connection, session_id="sess_state_001", started_at=STARTED_AT)

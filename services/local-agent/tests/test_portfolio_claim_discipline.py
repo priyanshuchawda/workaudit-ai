@@ -63,12 +63,17 @@ def test_packaging_docs_and_desktop_script_define_windows_nsis_build() -> None:
     packaging_doc = read_text("docs/packaging.md")
 
     assert package_json["scripts"]["package:windows"] == "tauri build --bundles nsis"
+    assert package_json["scripts"]["package:sidecar"] == "node scripts/build-sidecar.mjs"
     assert tauri_config["bundle"]["targets"] == ["nsis"]
+    assert tauri_config["bundle"]["externalBin"] == ["binaries/worktrace-local-agent"]
     assert tauri_config["bundle"]["windows"]["nsis"]["installMode"] == "currentUser"
     assert "pnpm --dir apps/desktop package:windows" in packaging_doc
+    assert "pnpm --dir apps/desktop package:sidecar" in packaging_doc
     assert "not code-signed" in packaging_doc
     assert "does not bundle the Python sidecar yet" in packaging_doc
     assert "configured sidecar launch path exists" in packaging_doc
+    assert "Packaging-ready sidecar binary lookup exists" in packaging_doc
+    assert "worktrace-local-agent-x86_64-pc-windows-msvc.exe" in packaging_doc
     assert "WORKTRACE_DB_PATH" in packaging_doc
 
 

@@ -21,3 +21,12 @@ Selective OCR policy:
 - private or blocked apps skip OCR
 - likely secret-risk screens refuse OCR before extraction
 - OCR snippets must be redacted and linked to screenshot evidence IDs
+
+Local report runtime policy:
+
+- report generation uses deterministic timeline evidence first and an LLM second
+- localhost-only Ollama-style report runtime calls are adapter-level only
+- non-local model endpoints are rejected
+- default report context budget is capped at 8192 tokens, with deep mode capped at 16384 tokens until benchmarks justify more
+- prompts are capped before transport and oversized prompts fail safely
+- model downloads, model server startup, embeddings, audio, and vision are out of scope for the first report runtime adapter

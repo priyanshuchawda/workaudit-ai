@@ -58,6 +58,17 @@ Selected-frame vision policy:
 - Qwen3-VL runtime calls must use localhost-only adapters with fakeable transports.
 - No Qwen3-VL model download, bundled model, or real runtime startup is enabled by default.
 
+Audio transcription policy:
+
+- audio transcription is off by default and requires explicit opt-in audio segments
+- always-on microphone capture is forbidden
+- private mode suppresses transcription before any engine call
+- transcripts must be redacted and linked to audio/source event evidence IDs
+- faster-whisper runtime binding is lazy and must not import heavy packages during normal recording or availability checks
+- default audio metadata target is faster-whisper `base` on CPU int8 for laptop safety
+- Distil-Whisper is manual-only until benchmarked on the target Windows laptop
+- no faster-whisper model download, bundled model, or real runtime startup is enabled by default
+
 Default report model config:
 
 - Default local report model: Gemma 4 E2B-it Q4.

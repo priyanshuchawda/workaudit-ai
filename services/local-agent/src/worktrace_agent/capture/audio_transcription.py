@@ -27,6 +27,7 @@ class AudioFailureCategory(StrEnum):
 class AudioTranscriptionPolicy:
     enabled: bool = False
     store_raw_audio: bool = False
+    private_mode: bool = False
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,10 @@ class TranscriptionEngineResult:
 
 
 class TranscriptionEngine(Protocol):
-    engine_name: str
+    @property
+    def engine_name(self) -> str:
+        """Safe display name for the transcription engine."""
+        ...
 
     def transcribe(self, segment: AudioSegment) -> TranscriptionEngineResult:
         """Transcribe an opt-in audio segment."""
@@ -84,7 +88,7 @@ def transcribe_audio_segment(
     engine: TranscriptionEngine,
 ) -> AudioTranscriptionResult:
     _validate_audio_segment(segment)
-    if not policy.enabled:
+    if not policy.enabled or policy.private_mode:
         return AudioTranscriptionResult(
             status=AudioTranscriptionStatus.DISABLED,
             transcript=None,

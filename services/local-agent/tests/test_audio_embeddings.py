@@ -45,6 +45,23 @@ def test_audio_transcription_policy_is_disabled_by_default_and_does_not_call_eng
     assert engine.call_count == 0
 
 
+def test_audio_transcription_private_mode_does_not_call_engine() -> None:
+    engine = FakeTranscriptionEngine(
+        TranscriptionEngineResult(text="should not run", confidence=0.9)
+    )
+
+    result = transcribe_audio_segment(
+        audio_segment(),
+        policy=AudioTranscriptionPolicy(enabled=True, private_mode=True),
+        engine=engine,
+    )
+
+    assert result.status == "disabled"
+    assert result.transcript is None
+    assert result.user_message == "Audio transcription is disabled."
+    assert engine.call_count == 0
+
+
 def test_opt_in_audio_transcription_redacts_text_and_cites_source_event() -> None:
     engine = FakeTranscriptionEngine(
         TranscriptionEngineResult(

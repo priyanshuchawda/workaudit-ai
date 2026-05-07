@@ -15,6 +15,8 @@ For #83, a localhost-only report runtime adapter may call a user-managed local m
 
 For #85, the desktop local AI report panel is wired through React, Tauri, and FastAPI boundary commands for status, generate, and cancel. The default service remains unavailable without a configured local runtime. The UI must not show full prompts and must not fake success.
 
+For #87, the default report model config is Gemma 4 E2B-it Q4. WorkTrace maps it to `gemma4:e2b` for Ollama-style localhost runtimes and records `google/gemma-4-E2B-it` as the Hugging Face source ID. This is manifest/config metadata only: no model is downloaded, loaded, started, or smoke-tested by WorkTrace.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

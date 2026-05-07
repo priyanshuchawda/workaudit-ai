@@ -12,11 +12,18 @@ from worktrace_agent.capture.file_watcher import FileSnapshotProvider
 from worktrace_agent.capture.screenshot_capture import ScreenshotProvider
 
 
-def _default_db_path() -> Path:
+def default_db_path() -> Path:
     configured_path = os.environ.get("WORKTRACE_DB_PATH")
     if configured_path:
         return Path(configured_path)
     return Path.home() / ".worktrace" / "db" / "worktrace.sqlite"
+
+
+def default_artifact_root(session_id: str) -> Path:
+    base = default_db_path().parent
+    if base.name == "db":
+        base = base.parent
+    return base / "sessions" / session_id
 
 
 def create_app(
@@ -34,7 +41,7 @@ def create_app(
         version=__version__,
     )
     app.state.session_recorder_service = SessionRecorderService(
-        db_path=db_path or _default_db_path(),
+        db_path=db_path or default_db_path(),
         active_window_provider=active_window_provider,
         screenshot_provider=screenshot_provider,
         file_snapshot_provider=file_snapshot_provider,

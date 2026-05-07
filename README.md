@@ -30,7 +30,7 @@ MVP 1B now includes real Windows active-window polling in the Python sidecar, wi
 
 MVP 1B now includes Tauri commands that can start, pause, resume, stop, and load events from a configured localhost Python sidecar bridge and otherwise return safe unavailable states so the desktop can fall back to fixture preview data.
 
-MVP 1B now includes a Tauri sidecar launch abstraction for a configured local sidecar binary and localhost port. It starts the process with local-only sidecar host/port environment, suppresses sidecar stdio, stops the managed process safely, and still returns safe missing/unhealthy states when no configured binary is available. The installer does not bundle the Python sidecar yet.
+MVP 1B now includes a Tauri sidecar launch abstraction for a configured local sidecar binary and localhost port. It starts the process with local-only sidecar host/port environment, suppresses sidecar stdio, stops the managed process safely, and still returns safe missing/unhealthy states when no configured binary is available. Packaging-ready sidecar binary lookup exists, Tauri is configured for a `worktrace-local-agent` external binary, and the Python sidecar has a local-only executable entrypoint. A local Windows package smoke has produced a PyInstaller sidecar artifact and NSIS installer with the sidecar artifact present. Python sidecar packaging is not bundled into the installer unless the target-triple sidecar artifact is produced before the Windows package build.
 
 MVP 1C now includes real Windows screenshot capture with 5-second interval defaults, 1280px max-width artifact storage, duplicate skipping, SQLite screenshot metadata, nearby active-window evidence linking, and safe screenshot deletion under the session artifact root. OCR is not implemented yet.
 
@@ -89,7 +89,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Privacy hardening covers implemented redaction and private-mode worker suppression paths, but the desktop privacy center, configurable blocklist UI, and complete cross-worker privacy management are still incomplete.
 - The desktop app now has a session dashboard foundation, sidecar-backed recorder controls, configured sidecar launch/stop handling, deterministic Markdown/raw JSON export review, screenshot metadata/delete UI, and a session browser with session deletion. Session folder-open shows the local path only; no shell open is wired yet.
 - The desktop AI report panel is intentionally unavailable. Real local LLM runtime integration and model downloads are not implemented.
-- Python sidecar packaging is not bundled into the installer yet.
+- Python sidecar packaging is not bundled into the installer unless `pnpm --dir apps/desktop package:sidecar` first produces the expected target-triple sidecar executable for Tauri. The Windows installer build smoke has passed locally with that artifact present, but installer install/run QA has not been performed.
 - Local model runtimes and model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.
 - Resource budget checks use deterministic fake samples, not a live Windows recording benchmark.

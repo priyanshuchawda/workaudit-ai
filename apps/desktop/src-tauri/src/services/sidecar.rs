@@ -1082,7 +1082,7 @@ fn configured_base_url() -> Option<String> {
     }
 
     let port = configured_sidecar_port()?;
-    Some(format!("http://127.0.0.1:{port}"))
+    Some(sidecar_base_url_from_port(port))
 }
 
 fn configured_sidecar_port() -> Option<u16> {
@@ -1096,24 +1096,46 @@ fn configured_sidecar_port() -> Option<u16> {
 }
 
 fn configured_sidecar_binary() -> Option<PathBuf> {
-    if let Ok(path) = env::var(SIDECAR_BIN_ENV) {
-        let path = PathBuf::from(path);
+    let configured_path = env::var(SIDECAR_BIN_ENV).ok().map(PathBuf::from);
+    let app_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+
+    resolve_sidecar_binary(configured_path, app_dir)
+}
+
+pub fn sidecar_base_url_from_port(port: u16) -> String {
+    format!("http://127.0.0.1:{port}")
+}
+
+pub fn resolve_sidecar_binary(
+    configured_path: Option<PathBuf>,
+    app_dir: PathBuf,
+) -> Option<PathBuf> {
+    if let Some(path) = configured_path {
         if path.is_file() {
             return Some(path);
         }
     }
 
-    bundled_sidecar_binary()
+    bundled_sidecar_binary_in_dir(app_dir)
 }
 
-fn bundled_sidecar_binary() -> Option<PathBuf> {
-    let app_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+fn bundled_sidecar_binary_in_dir(app_dir: PathBuf) -> Option<PathBuf> {
     let candidates = [
         app_dir.join("sidecars").join(BUNDLED_SIDECAR_NAME),
         app_dir.join(BUNDLED_SIDECAR_NAME),
     ];
 
     candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+pub fn sidecar_launch_environment(port: u16) -> [(String, String); 2] {
+    [
+        (
+            "WORKTRACE_SIDECAR_HOST".to_string(),
+            "127.0.0.1".to_string(),
+        ),
+        ("WORKTRACE_SIDECAR_PORT".to_string(), port.to_string()),
+    ]
 }
 
 fn start_managed_sidecar(binary_path: PathBuf) -> SidecarHealth {
@@ -1134,16 +1156,14 @@ fn start_managed_sidecar(binary_path: PathBuf) -> SidecarHealth {
     let mut command = Command::new(binary_path);
     command
         .args(configured_sidecar_args())
-        .env("WORKTRACE_SIDECAR_HOST", "127.0.0.1")
-        .env(
-            "WORKTRACE_SIDECAR_PORT",
-            configured_sidecar_port()
-                .unwrap_or(DEFAULT_SIDECAR_PORT)
-                .to_string(),
-        )
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    for (key, value) in
+        sidecar_launch_environment(configured_sidecar_port().unwrap_or(DEFAULT_SIDECAR_PORT))
+    {
+        command.env(key, value);
+    }
 
     let Ok(child) = command.spawn() else {
         return unhealthy_health("Local agent sidecar process could not be started.");

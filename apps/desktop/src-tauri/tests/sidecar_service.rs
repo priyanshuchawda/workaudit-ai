@@ -1,10 +1,11 @@
 use std::{
-    env,
+    env, fs,
     io::{Read, Write},
     net::TcpListener,
     path::PathBuf,
     sync::Mutex,
     thread,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use worktrace_desktop_lib::commands::sidecar::{
     delete_session, delete_session_screenshots, export_session_markdown, export_session_raw_json,
@@ -13,12 +14,66 @@ use worktrace_desktop_lib::commands::sidecar::{
     stop_recording_session,
 };
 use worktrace_desktop_lib::services::sidecar::{
+    resolve_sidecar_binary, sidecar_base_url_from_port, sidecar_launch_environment,
     RecorderControlStatus, ScreenshotDeletionStatus, SessionDeletionStatus, SessionEventsStatus,
     SessionExportStatus, SessionFolderStatus, SessionListStatus, SessionScreenshotsStatus,
     SidecarService, SidecarStatus,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+#[test]
+fn sidecar_binary_lookup_prefers_configured_worktrace_sidecar_bin() {
+    let temp_root = unique_temp_dir("configured_bin");
+    let configured = touch_file(&temp_root.join("configured-sidecar.exe"));
+    let bundled = touch_file(&temp_root.join("sidecars").join("worktrace-local-agent.exe"));
+
+    let found = resolve_sidecar_binary(Some(configured.clone()), temp_root.clone());
+
+    assert_eq!(found, Some(configured));
+    assert!(bundled.is_file());
+    remove_temp_dir(temp_root);
+}
+
+#[test]
+fn sidecar_binary_lookup_finds_bundled_worktrace_local_agent_exe() {
+    let temp_root = unique_temp_dir("bundled_bin");
+    let bundled = touch_file(&temp_root.join("sidecars").join("worktrace-local-agent.exe"));
+
+    let found = resolve_sidecar_binary(None, temp_root.clone());
+
+    assert_eq!(found, Some(bundled));
+    remove_temp_dir(temp_root);
+}
+
+#[test]
+fn start_sidecar_launch_environment_is_local_only_and_deterministic() {
+    let env = sidecar_launch_environment(4567);
+
+    assert!(env.contains(&(
+        "WORKTRACE_SIDECAR_HOST".to_string(),
+        "127.0.0.1".to_string()
+    )));
+    assert!(env.contains(&("WORKTRACE_SIDECAR_PORT".to_string(), "4567".to_string())));
+}
+
+#[test]
+fn invalid_non_localhost_sidecar_url_is_rejected() {
+    let service = SidecarService;
+
+    let health = service.health_from_base_url("http://192.168.1.10:8765");
+
+    assert_eq!(health.status, SidecarStatus::Unhealthy);
+    assert_eq!(
+        health.message,
+        "Local agent sidecar URL must use localhost."
+    );
+}
+
+#[test]
+fn configured_port_builds_localhost_base_url() {
+    assert_eq!(sidecar_base_url_from_port(4567), "http://127.0.0.1:4567");
+}
 
 #[test]
 fn default_sidecar_health_reports_missing_binary() {
@@ -702,6 +757,26 @@ fn sleeper_command() -> Option<(PathBuf, &'static str)> {
     }
 
     None
+}
+
+fn unique_temp_dir(name: &str) -> PathBuf {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_nanos();
+    env::temp_dir().join(format!("worktrace_sidecar_test_{name}_{now}"))
+}
+
+fn touch_file(path: &PathBuf) -> PathBuf {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create parent directory");
+    }
+    fs::write(path, b"test sidecar").expect("write sidecar placeholder");
+    path.clone()
+}
+
+fn remove_temp_dir(path: PathBuf) {
+    let _ = fs::remove_dir_all(path);
 }
 
 fn with_sidecar_env(

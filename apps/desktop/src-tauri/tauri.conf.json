@@ -26,6 +26,9 @@
     "targets": [
       "nsis"
     ],
+    "externalBin": [
+      "binaries/worktrace-local-agent"
+    ],
     "windows": {
       "nsis": {
         "installMode": "currentUser"

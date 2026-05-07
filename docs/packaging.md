@@ -22,6 +22,58 @@ distributed as NSIS setup executables or MSI installers. NSIS is the safer first
 target here because this repo is not ready for WiX/MSI release handling or
 signing review.
 
+## Python sidecar executable target
+
+The Python local agent now has a thin executable entrypoint:
+
+```powershell
+cd services/local-agent
+uv run --python 3.13 python -m worktrace_agent
+```
+
+The entrypoint reads only local sidecar launch settings:
+
+- `WORKTRACE_SIDECAR_HOST`, defaulting to `127.0.0.1` and rejecting non-local hosts.
+- `WORKTRACE_SIDECAR_PORT`, defaulting to `8765`.
+- `WORKTRACE_DB_PATH`, defaulting to `~/.worktrace/db/worktrace.sqlite`.
+
+Session artifacts default under the local database root. For example, with the
+default database path, session artifacts live under:
+
+```txt
+~/.worktrace/sessions/{session_id}/
+```
+
+The desktop package has a sidecar build helper:
+
+```powershell
+pnpm --dir apps/desktop package:sidecar
+```
+
+That command uses PyInstaller through the uv-managed Python 3.13 local-agent
+environment and prepares the target-triple binary expected by Tauri. On the
+current Windows target, the expected output is:
+
+```txt
+apps/desktop/src-tauri/binaries/worktrace-local-agent-x86_64-pc-windows-msvc.exe
+```
+
+The generated binary directory is git-ignored because it is a local build
+artifact, not source code.
+
+Tauri is configured with:
+
+```json
+"externalBin": [
+  "binaries/worktrace-local-agent"
+]
+```
+
+Tauri v2 requires the on-disk sidecar artifact to include the current target
+triple suffix before `tauri build` runs. Packaging-ready sidecar binary lookup exists.
+The Rust sidecar service checks a configured `WORKTRACE_SIDECAR_BIN`, a sidecar
+beside the app executable, or a sidecar under a sibling `sidecars/` folder.
+
 ## Sidecar launch status
 
 The Tauri sidecar service can now use a configured local Python sidecar bridge
@@ -50,12 +102,36 @@ Successful local builds create an ignored artifact like:
 apps/desktop/src-tauri/target/release/bundle/nsis/WorkTrace AI_0.1.0_x64-setup.exe
 ```
 
+## Local smoke result
+
+On 2026-05-07, the following local packaging smoke passed on Windows:
+
+```powershell
+pnpm --dir apps/desktop package:sidecar
+pnpm --dir apps/desktop package:windows
+```
+
+The sidecar build produced:
+
+```txt
+apps/desktop/src-tauri/binaries/worktrace-local-agent-x86_64-pc-windows-msvc.exe
+```
+
+The packaged sidecar executable was also started directly with
+`WORKTRACE_SIDECAR_HOST=127.0.0.1`, `WORKTRACE_SIDECAR_PORT=8876`, and a
+temporary `WORKTRACE_DB_PATH`; `/health` returned `status: ok` and schema
+`003_ocr_results.sql`.
+
 ## Current limits
 
 - The installer is not code-signed.
-- The installer does not bundle the Python sidecar yet.
-- The configured sidecar launch path exists, but full installer integration for
-  a packaged Python sidecar artifact is not complete yet.
+- The installer does not bundle the Python sidecar yet unless the
+  `package:sidecar` command has produced the target-triple sidecar executable
+  before `package:windows` is run. The local Windows package build smoke has
+  passed with that artifact present.
+- The configured sidecar launch path exists, and Packaging-ready sidecar binary lookup exists,
+  but installer install/run QA must be performed before claiming a release-ready
+  bundled sidecar installer.
 - The installer does not bundle local AI models.
 - The app is still a desktop shell and preview UI.
 - There is no updater configuration.
@@ -70,6 +146,7 @@ pnpm --dir apps/desktop typecheck
 pnpm --dir apps/desktop lint
 pnpm --dir apps/desktop test
 pnpm --dir apps/desktop build
+pnpm --dir apps/desktop package:sidecar
 pnpm --dir apps/desktop package:windows
 ```
 

@@ -5,10 +5,13 @@ pub mod services;
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            commands::sidecar::cancel_ai_report,
             commands::sidecar::delete_session,
             commands::sidecar::delete_session_screenshots,
             commands::sidecar::export_session_markdown,
             commands::sidecar::export_session_raw_json,
+            commands::sidecar::generate_ai_report,
+            commands::sidecar::get_ai_report_status,
             commands::sidecar::get_sidecar_health,
             commands::sidecar::get_session_events,
             commands::sidecar::get_session_folder,

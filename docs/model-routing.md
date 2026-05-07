@@ -26,6 +26,9 @@ Local report runtime policy:
 
 - report generation uses deterministic timeline evidence first and an LLM second
 - localhost-only Ollama-style report runtime calls are adapter-level only
+- desktop local AI report controls call only typed Tauri/FastAPI boundary commands
+- the default UI/runtime state is unavailable until a local runtime is explicitly configured
+- generated reports must show evidence IDs and model metadata without exposing the full prompt
 - non-local model endpoints are rejected
 - default report context budget is capped at 8192 tokens, with deep mode capped at 16384 tokens until benchmarks justify more
 - prompts are capped before transport and oversized prompts fail safely

@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from worktrace_agent import __version__
+from worktrace_agent.api.ai_report_service import AiReportService, UnavailableAiReportService
 from worktrace_agent.api.routes.health import router as health_router
 from worktrace_agent.api.routes.sessions import router as sessions_router
 from worktrace_agent.api.session_recorder_service import SessionRecorderService
@@ -35,6 +36,7 @@ def create_app(
     recorder_poll_interval_seconds: float = 1,
     screenshot_interval_seconds: float = 5,
     file_watch_interval_seconds: float = 1,
+    ai_report_service: AiReportService | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="WorkTrace Local Agent",
@@ -49,6 +51,7 @@ def create_app(
         screenshot_interval_seconds=screenshot_interval_seconds,
         file_watch_interval_seconds=file_watch_interval_seconds,
     )
+    app.state.ai_report_service = ai_report_service or UnavailableAiReportService()
     app.include_router(health_router)
     app.include_router(sessions_router)
     return app

@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 22:08 local / 2026-05-07 16:38 UTC
+2026-05-07 22:35 local / 2026-05-07 17:05 UTC
 
 ## Current Issue
-#83 — Local LLM report runtime
+#85 — AI report UI + generate button
 
 ## Current Branch
-feat/83-local-llm-report-runtime
+feat/85-ai-report-ui
 
 ## Current Phase
-Self-review and PR preparation
+PR preparation
 
 ## Completed Since Last Update
 - #69 export/review UX merged via PR #70.
@@ -55,17 +55,34 @@ Self-review and PR preparation
 - Added red tests for rejecting local report runtime base URLs with credentials or path prefixes.
 - Tightened local report runtime URL normalization to allow only a localhost origin.
 - Ran the full #83 quality gate successfully after final test/doc updates.
+- Opened PR #84 for #83, confirmed GitGuardian check passed, merged PR #84 into `main`, and confirmed issue #83 is closed.
+- Created #85: AI report UI + generate button.
+- Started branch `feat/85-ai-report-ui` from updated `main`.
+- Inspected the existing React export panel, Tauri sidecar bridge, FastAPI session routes, deterministic timeline builder, report contract, and model availability states.
+- Wrote the #85 implementation plan at `docs/superpowers/plans/2026-05-07-ai-report-ui.md`.
+- Added red tests for FastAPI AI report status/generate/cancel routes, Rust sidecar AI report bridge commands, and React AI report UI unavailable/success/cancel/recording-disabled states.
+- Implemented FastAPI AI report boundary routes with a default unavailable service and test injection, Rust typed localhost bridge commands, typed Tauri client wrappers, and the desktop local AI report panel.
+- Updated README/model docs/claim-discipline expectations to state that the UI is wired but defaults to unavailable without a configured local runtime.
+- Added safe failed-state handling when an injected/report service raises, so generation returns a redacted `failed_safely` result instead of leaking prompt/runtime errors.
+- Reran the full #85 quality gate successfully.
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
-- `docs/superpowers/plans/2026-05-07-local-llm-report-runtime.md`
-- `services/local-agent/tests/test_local_report_runtime.py`
-- `services/local-agent/src/worktrace_agent/ai/local_report_runtime.py`
+- `docs/superpowers/plans/2026-05-07-ai-report-ui.md`
 - `README.md`
+- `apps/desktop/src/App.test.tsx`
+- `apps/desktop/src/App.tsx`
+- `apps/desktop/src/lib/tauri-client.ts`
+- `apps/desktop/src-tauri/src/commands/sidecar.rs`
+- `apps/desktop/src-tauri/src/lib.rs`
+- `apps/desktop/src-tauri/src/services/sidecar.rs`
+- `apps/desktop/src-tauri/tests/sidecar_service.rs`
 - `docs/model-routing.md`
 - `docs/models/local_model_runtime.md`
-- `docs/models/gemma.md`
-- `docs/models/qwen.md`
+- `services/local-agent/src/worktrace_agent/api/ai_report_service.py`
+- `services/local-agent/src/worktrace_agent/api/app.py`
+- `services/local-agent/src/worktrace_agent/api/routes/sessions.py`
+- `services/local-agent/tests/api/test_ai_report_routes.py`
 - `services/local-agent/tests/test_portfolio_claim_discipline.py`
 
 ## Tests Run
@@ -142,16 +159,39 @@ Self-review and PR preparation
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 28 Rust integration tests.
 - `git diff --check` — passed.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/api/test_ai_report_routes.py -q` — failed as expected: routes/injection missing.
+- `pnpm --dir apps/desktop test -- --run App.test.tsx` — failed as expected: AI report UI still static/unwired.
+- `cd apps/desktop/src-tauri; cargo test --test sidecar_service ai_report -- --nocapture` — failed as expected: AI report bridge commands/types missing.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/api/test_ai_report_routes.py -q` — passed, 4 tests.
+- `cd apps/desktop/src-tauri; cargo test --test sidecar_service ai_report -- --nocapture` — passed, 3 focused AI report bridge tests.
+- `pnpm --dir apps/desktop test -- --run App.test.tsx` — passed, 27 tests after waiting for async report status in the new tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed, 1 file reformatted after safe failure updates.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/api/test_ai_report_routes.py tests/test_portfolio_claim_discipline.py -q` — passed, 11 tests.
+- `pnpm --dir apps/desktop test -- --run App.test.tsx` — passed, 28 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — passed.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 192 tests.
+- `pnpm --dir apps/desktop test` — passed, 28 tests.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed, 14 tests.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
+- `git diff --check` — passed.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #83 does not change packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #83 does not change packaging.
+- `pnpm --dir apps/desktop package:sidecar` — not run; #85 does not change sidecar packaging.
+- `pnpm --dir apps/desktop package:windows` — not run; #85 does not change installer packaging.
+- Real Ollama/Gemma/Qwen smoke — not run; #85 uses fake/report-boundary tests and no model download/runtime startup.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Review diff, commit, push, open PR for #83, and watch checks.
+Stage scoped #85 files only, commit, push `feat/85-ai-report-ui`, open PR, and watch checks.
 
 ## Do Not Forget
 - No OCR before OCR issue.

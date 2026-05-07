@@ -71,6 +71,52 @@ export type SessionExportResult =
   | { status: "available"; message: string; export: SessionExportPreview }
   | { status: "unavailable"; message: string; export: null };
 
+export type AiReportStatus =
+  | "not_installed"
+  | "runtime_unavailable"
+  | "loading"
+  | "ready"
+  | "running"
+  | "failed_safely"
+  | "complete"
+  | "too_slow"
+  | "cancelled";
+
+export type AiReportClaim = {
+  title?: string | null;
+  text?: string | null;
+  path?: string | null;
+  command?: string | null;
+  evidenceEventIds: string[];
+};
+
+export type AiReportPayload = {
+  sessionId: string;
+  sessionTitle: string;
+  summary: AiReportClaim;
+  timeline: AiReportClaim[];
+  blockers: AiReportClaim[];
+  repeatedActions: AiReportClaim[];
+  importantFiles: AiReportClaim[];
+  commands: AiReportClaim[];
+  workflowSteps: AiReportClaim[];
+  confidence: number;
+  knownEvidenceEventIds: string[];
+};
+
+export type AiReportResult = {
+  status: AiReportStatus;
+  message: string;
+  canGenerate: boolean;
+  report: AiReportPayload | null;
+  evidenceIds: string[];
+  modelName: string | null;
+  modelVersion: string | null;
+  runtimeMs: number | null;
+  inputHash: string | null;
+  generatedAt: string | null;
+};
+
 export type SessionFolderResult =
   | { status: "available"; message: string; path: string }
   | { status: "unavailable"; message: string; path: null };
@@ -157,6 +203,9 @@ const SIDE_CAR_COMMANDS = {
   stopRecordingSession: "stop_recording_session",
   exportSessionMarkdown: "export_session_markdown",
   exportSessionRawJson: "export_session_raw_json",
+  aiReportStatus: "get_ai_report_status",
+  generateAiReport: "generate_ai_report",
+  cancelAiReport: "cancel_ai_report",
   sessionFolder: "get_session_folder",
   sessionScreenshots: "get_session_screenshots",
   deleteSessionScreenshots: "delete_session_screenshots",
@@ -181,6 +230,19 @@ const SESSION_EXPORT_FALLBACK: SessionExportResult = {
   status: "unavailable",
   message: "Session export bridge is unavailable.",
   export: null,
+};
+
+const AI_REPORT_FALLBACK: AiReportResult = {
+  status: "runtime_unavailable",
+  message: "Local AI report bridge is unavailable.",
+  canGenerate: false,
+  report: null,
+  evidenceIds: [],
+  modelName: null,
+  modelVersion: null,
+  runtimeMs: null,
+  inputHash: null,
+  generatedAt: null,
 };
 
 const SESSION_FOLDER_FALLBACK: SessionFolderResult = {
@@ -296,6 +358,35 @@ export async function exportSessionRawJson(sessionId: string): Promise<SessionEx
     });
   } catch {
     return SESSION_EXPORT_FALLBACK;
+  }
+}
+
+export async function getAiReportStatus(sessionId: string): Promise<AiReportResult> {
+  try {
+    return await invoke<AiReportResult>(SIDE_CAR_COMMANDS.aiReportStatus, { sessionId });
+  } catch {
+    return AI_REPORT_FALLBACK;
+  }
+}
+
+export async function generateAiReport(sessionId: string): Promise<AiReportResult> {
+  try {
+    return await invoke<AiReportResult>(SIDE_CAR_COMMANDS.generateAiReport, { sessionId });
+  } catch {
+    return AI_REPORT_FALLBACK;
+  }
+}
+
+export async function cancelAiReport(sessionId: string): Promise<AiReportResult> {
+  try {
+    return await invoke<AiReportResult>(SIDE_CAR_COMMANDS.cancelAiReport, { sessionId });
+  } catch {
+    return {
+      ...AI_REPORT_FALLBACK,
+      status: "cancelled",
+      message: "Local AI report generation cancelled.",
+      canGenerate: true,
+    };
   }
 }
 

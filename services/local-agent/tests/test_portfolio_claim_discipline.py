@@ -43,7 +43,11 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "no real local runtime smoke has been run" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "deterministic Markdown/raw JSON export review" in readme
-    assert "AI report panel is intentionally unavailable" in readme
+    assert (
+        "desktop AI report UI is wired through React, Tauri, and FastAPI boundary commands"
+        in readme
+    )
+    assert "default runtime state is unavailable" in readme
     assert "Python sidecar packaging is not bundled" in readme
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme

@@ -8,13 +8,13 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use worktrace_desktop_lib::commands::sidecar::{
-    delete_session, delete_session_screenshots, export_session_markdown, export_session_raw_json,
-    get_session_events, get_session_folder, get_session_screenshots, get_sessions,
-    pause_recording_session, resume_recording_session, start_recording_session,
-    stop_recording_session,
+    cancel_ai_report, delete_session, delete_session_screenshots, export_session_markdown,
+    export_session_raw_json, generate_ai_report, get_ai_report_status, get_session_events,
+    get_session_folder, get_session_screenshots, get_sessions, pause_recording_session,
+    resume_recording_session, start_recording_session, stop_recording_session,
 };
 use worktrace_desktop_lib::services::sidecar::{
-    resolve_sidecar_binary, sidecar_base_url_from_port, sidecar_launch_environment,
+    resolve_sidecar_binary, sidecar_base_url_from_port, sidecar_launch_environment, AiReportStatus,
     RecorderControlStatus, ScreenshotDeletionStatus, SessionDeletionStatus, SessionEventsStatus,
     SessionExportStatus, SessionFolderStatus, SessionListStatus, SessionScreenshotsStatus,
     SidecarService, SidecarStatus,
@@ -184,6 +184,21 @@ fn export_commands_return_safe_unavailable_state_when_bridge_is_missing() {
         assert!(markdown.export.is_none());
         assert!(raw_json.export.is_none());
         assert!(folder.path.is_none());
+    });
+}
+
+#[test]
+fn ai_report_commands_return_safe_unavailable_state_when_bridge_is_missing() {
+    with_sidecar_env(None, None, None, None, || {
+        let status = get_ai_report_status("sess_ai_001".to_string());
+        let generated = generate_ai_report("sess_ai_001".to_string());
+        let cancelled = cancel_ai_report("sess_ai_001".to_string());
+
+        assert_eq!(status.status, AiReportStatus::RuntimeUnavailable);
+        assert_eq!(generated.status, AiReportStatus::RuntimeUnavailable);
+        assert_eq!(cancelled.status, AiReportStatus::Cancelled);
+        assert!(status.report.is_none());
+        assert!(generated.report.is_none());
     });
 }
 
@@ -479,6 +494,70 @@ fn exports_load_preview_and_folder_from_local_sidecar() {
 }
 
 #[test]
+fn ai_report_calls_local_sidecar_and_redacts_metadata() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        let expected_paths = [
+            "GET /sessions/sess_ai_bridge_001/ai-report/status HTTP/1.1",
+            "POST /sessions/sess_ai_bridge_001/ai-report/generate HTTP/1.1",
+            "POST /sessions/sess_ai_bridge_001/ai-report/cancel HTTP/1.1",
+        ];
+        let bodies = [
+            r#"{"status":"ready","message":"Local AI report runtime is ready.","can_generate":true,"report":null,"evidence_ids":[],"model_name":"fake-local-report-model","model_version":"fake-v1","runtime_ms":null,"input_hash":null,"generated_at":null}"#.to_string(),
+            r#"{"status":"complete","message":"Local AI report generated.","can_generate":true,"report":{"session_id":"sess_ai_bridge_001","session_title":"Bridge fixture","summary":{"text":"Tests were run.","evidence_event_ids":["evt_ai_bridge_001"]},"timeline":[],"blockers":[],"repeated_actions":[],"important_files":[],"commands":[{"command":"pnpm test","evidence_event_ids":["evt_ai_bridge_001"]}],"workflow_steps":[],"confidence":0.8,"known_evidence_event_ids":["evt_ai_bridge_001"]},"evidence_ids":["evt_ai_bridge_001"],"model_name":"fake-local-report-model password=mysecret","model_version":"fake-v1","runtime_ms":42,"input_hash":"sha256:fake-input-hash","generated_at":"2026-05-06T09:15:10+05:30"}"#.to_string(),
+            r#"{"status":"cancelled","message":"Local AI report generation cancelled.","can_generate":true,"report":null,"evidence_ids":[],"model_name":"fake-local-report-model","model_version":"fake-v1","runtime_ms":null,"input_hash":null,"generated_at":null}"#.to_string(),
+        ];
+
+        for (expected_path, body) in expected_paths.iter().zip(bodies.iter()) {
+            let (mut stream, _) = listener.accept().expect("accept sidecar request");
+            let mut request = [0_u8; 2048];
+            let read_count = stream.read(&mut request).expect("read sidecar request");
+            let request_text = String::from_utf8_lossy(&request[..read_count]);
+            assert!(request_text.starts_with(expected_path));
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+        }
+    });
+
+    let service = SidecarService;
+    let base_url = format!("http://127.0.0.1:{port}");
+    let status =
+        service.ai_report_status_from_base_url("sess_ai_bridge_001".to_string(), &base_url);
+    let generated =
+        service.generate_ai_report_from_base_url("sess_ai_bridge_001".to_string(), &base_url);
+    let cancelled =
+        service.cancel_ai_report_from_base_url("sess_ai_bridge_001".to_string(), &base_url);
+    handle.join().expect("join local server");
+
+    assert_eq!(status.status, AiReportStatus::Ready);
+    assert_eq!(generated.status, AiReportStatus::Complete);
+    assert_eq!(cancelled.status, AiReportStatus::Cancelled);
+    assert_eq!(generated.evidence_ids, vec!["evt_ai_bridge_001"]);
+    assert_eq!(generated.runtime_ms, Some(42));
+    assert_eq!(
+        generated.model_name.as_deref(),
+        Some("fake-local-report-model [REDACTED]")
+    );
+    assert_eq!(
+        generated
+            .report
+            .as_ref()
+            .expect("generated report")
+            .summary
+            .evidence_event_ids,
+        vec!["evt_ai_bridge_001"]
+    );
+}
+
+#[test]
 fn screenshots_load_metadata_and_delete_through_local_sidecar() {
     let secret = ["password=", "mysecret"].concat();
     let response_secret = secret.clone();
@@ -615,6 +694,19 @@ fn exports_reject_empty_session_ids_without_side_effects() {
     assert_eq!(markdown.status, SessionExportStatus::Unavailable);
     assert_eq!(raw_json.status, SessionExportStatus::Unavailable);
     assert_eq!(folder.status, SessionFolderStatus::Unavailable);
+}
+
+#[test]
+fn ai_report_rejects_empty_session_ids_without_side_effects() {
+    let service = SidecarService;
+
+    let status = service.ai_report_status_from_base_url(" ".to_string(), "http://127.0.0.1:65534");
+    let generated =
+        service.generate_ai_report_from_base_url("".to_string(), "http://127.0.0.1:65534");
+
+    assert_eq!(status.status, AiReportStatus::RuntimeUnavailable);
+    assert_eq!(generated.status, AiReportStatus::RuntimeUnavailable);
+    assert!(generated.report.is_none());
 }
 
 #[test]

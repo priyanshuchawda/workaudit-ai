@@ -192,6 +192,61 @@ pub struct SessionExportResult {
     pub export: Option<SessionExportPreview>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiReportStatus {
+    NotInstalled,
+    RuntimeUnavailable,
+    Loading,
+    Ready,
+    Running,
+    FailedSafely,
+    Complete,
+    TooSlow,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct AiReportClaim {
+    pub title: Option<String>,
+    pub text: Option<String>,
+    pub path: Option<String>,
+    pub command: Option<String>,
+    pub evidence_event_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct AiReportPayload {
+    pub session_id: String,
+    pub session_title: String,
+    pub summary: AiReportClaim,
+    pub timeline: Vec<AiReportClaim>,
+    pub blockers: Vec<AiReportClaim>,
+    pub repeated_actions: Vec<AiReportClaim>,
+    pub important_files: Vec<AiReportClaim>,
+    pub commands: Vec<AiReportClaim>,
+    pub workflow_steps: Vec<AiReportClaim>,
+    pub confidence: f64,
+    pub known_evidence_event_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct AiReportResult {
+    pub status: AiReportStatus,
+    pub message: String,
+    pub can_generate: bool,
+    pub report: Option<AiReportPayload>,
+    pub evidence_ids: Vec<String>,
+    pub model_name: Option<String>,
+    pub model_version: Option<String>,
+    pub runtime_ms: Option<i64>,
+    pub input_hash: Option<String>,
+    pub generated_at: Option<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SessionFolderStatus {
@@ -590,6 +645,54 @@ impl SidecarService {
         )
     }
 
+    pub fn ai_report_status(&self, session_id: String) -> AiReportResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_ai_report();
+        };
+
+        self.ai_report_status_from_base_url(session_id, &base_url)
+    }
+
+    pub fn ai_report_status_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> AiReportResult {
+        self.ai_report_from_base_url(session_id, base_url, "GET", "status")
+    }
+
+    pub fn generate_ai_report(&self, session_id: String) -> AiReportResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_ai_report();
+        };
+
+        self.generate_ai_report_from_base_url(session_id, &base_url)
+    }
+
+    pub fn generate_ai_report_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> AiReportResult {
+        self.ai_report_from_base_url(session_id, base_url, "POST", "generate")
+    }
+
+    pub fn cancel_ai_report(&self, session_id: String) -> AiReportResult {
+        let Some(base_url) = configured_base_url() else {
+            return cancelled_ai_report();
+        };
+
+        self.cancel_ai_report_from_base_url(session_id, &base_url)
+    }
+
+    pub fn cancel_ai_report_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> AiReportResult {
+        self.ai_report_from_base_url(session_id, base_url, "POST", "cancel")
+    }
+
     pub fn session_folder(&self, session_id: String) -> SessionFolderResult {
         let Some(base_url) = configured_base_url() else {
             return unavailable_folder();
@@ -809,6 +912,35 @@ impl SidecarService {
             export: Some(export.redacted()),
         }
     }
+
+    fn ai_report_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+        method: &str,
+        action: &str,
+    ) -> AiReportResult {
+        if session_id.trim().is_empty() {
+            return unavailable_ai_report();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_ai_report();
+        };
+        let path = format!(
+            "/sessions/{}/ai-report/{}",
+            encode_path_segment(&session_id),
+            action
+        );
+        let Ok(body_text) = request_local_json(&endpoint, method, &path, None) else {
+            return unavailable_ai_report();
+        };
+        let Ok(result) = serde_json::from_str::<AiReportResult>(&body_text) else {
+            return unavailable_ai_report();
+        };
+
+        result.redacted()
+    }
 }
 
 fn missing_health(message: &str) -> SidecarHealth {
@@ -881,6 +1013,36 @@ fn unavailable_export() -> SessionExportResult {
     }
 }
 
+fn unavailable_ai_report() -> AiReportResult {
+    AiReportResult {
+        status: AiReportStatus::RuntimeUnavailable,
+        message: "Local AI report bridge is unavailable.".to_string(),
+        can_generate: false,
+        report: None,
+        evidence_ids: Vec::new(),
+        model_name: None,
+        model_version: None,
+        runtime_ms: None,
+        input_hash: None,
+        generated_at: None,
+    }
+}
+
+fn cancelled_ai_report() -> AiReportResult {
+    AiReportResult {
+        status: AiReportStatus::Cancelled,
+        message: "Local AI report generation cancelled.".to_string(),
+        can_generate: true,
+        report: None,
+        evidence_ids: Vec::new(),
+        model_name: None,
+        model_version: None,
+        runtime_ms: None,
+        input_hash: None,
+        generated_at: None,
+    }
+}
+
 fn unavailable_folder() -> SessionFolderResult {
     SessionFolderResult {
         status: SessionFolderStatus::Unavailable,
@@ -945,6 +1107,93 @@ impl SessionExportPreview {
             preview: redact_text(&self.preview),
             evidence_ids: self
                 .evidence_ids
+                .into_iter()
+                .map(|evidence_id| redact_text(&evidence_id))
+                .collect(),
+        }
+    }
+}
+
+impl AiReportResult {
+    fn redacted(self) -> Self {
+        Self {
+            status: self.status,
+            message: redact_text(&self.message),
+            can_generate: self.can_generate,
+            report: self.report.map(AiReportPayload::redacted),
+            evidence_ids: self
+                .evidence_ids
+                .into_iter()
+                .map(|evidence_id| redact_text(&evidence_id))
+                .collect(),
+            model_name: self.model_name.map(|model_name| redact_text(&model_name)),
+            model_version: self
+                .model_version
+                .map(|model_version| redact_text(&model_version)),
+            runtime_ms: self.runtime_ms,
+            input_hash: self.input_hash.map(|input_hash| redact_text(&input_hash)),
+            generated_at: self
+                .generated_at
+                .map(|generated_at| redact_text(&generated_at)),
+        }
+    }
+}
+
+impl AiReportPayload {
+    fn redacted(self) -> Self {
+        Self {
+            session_id: redact_text(&self.session_id),
+            session_title: redact_text(&self.session_title),
+            summary: self.summary.redacted(),
+            timeline: self
+                .timeline
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            blockers: self
+                .blockers
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            repeated_actions: self
+                .repeated_actions
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            important_files: self
+                .important_files
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            commands: self
+                .commands
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            workflow_steps: self
+                .workflow_steps
+                .into_iter()
+                .map(AiReportClaim::redacted)
+                .collect(),
+            confidence: self.confidence,
+            known_evidence_event_ids: self
+                .known_evidence_event_ids
+                .into_iter()
+                .map(|evidence_id| redact_text(&evidence_id))
+                .collect(),
+        }
+    }
+}
+
+impl AiReportClaim {
+    fn redacted(self) -> Self {
+        Self {
+            title: self.title.map(|title| redact_text(&title)),
+            text: self.text.map(|text| redact_text(&text)),
+            path: self.path.map(|path| redact_text(&path)),
+            command: self.command.map(|command| redact_text(&command)),
+            evidence_event_ids: self
+                .evidence_event_ids
                 .into_iter()
                 .map(|evidence_id| redact_text(&evidence_id))
                 .collect(),

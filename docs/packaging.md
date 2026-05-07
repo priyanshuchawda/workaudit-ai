@@ -22,6 +22,28 @@ distributed as NSIS setup executables or MSI installers. NSIS is the safer first
 target here because this repo is not ready for WiX/MSI release handling or
 signing review.
 
+## Sidecar launch status
+
+The Tauri sidecar service can now use a configured local Python sidecar bridge
+without requiring a manual `WORKTRACE_SIDECAR_URL` in the normal code path:
+
+- `WORKTRACE_SIDECAR_PORT` selects the localhost port for health, event, and
+  recorder-control requests.
+- `WORKTRACE_SIDECAR_BIN` selects a local sidecar executable/script to start.
+  If it is absent, the desktop looks for a packaged `worktrace-local-agent`
+  executable next to the desktop app or under a sibling `sidecars/` folder.
+- `WORKTRACE_SIDECAR_ARGS` passes simple whitespace-separated arguments without
+  invoking a shell.
+- `WORKTRACE_DB_PATH` can point the Python sidecar at a specific SQLite file;
+  session artifacts are stored under the database parent by the current Python
+  session service.
+
+When a configured sidecar binary is started, Tauri sets
+`WORKTRACE_SIDECAR_HOST=127.0.0.1`, sets `WORKTRACE_SIDECAR_PORT`, suppresses
+sidecar stdio, inherits the local process environment for DB path configuration,
+and can stop the managed process. Missing or unhealthy sidecars still return
+safe missing/unhealthy states instead of panicking.
+
 Successful local builds create an ignored artifact like:
 
 ```txt
@@ -32,6 +54,8 @@ apps/desktop/src-tauri/target/release/bundle/nsis/WorkTrace AI_0.1.0_x64-setup.e
 
 - The installer is not code-signed.
 - The installer does not bundle the Python sidecar yet.
+- The configured sidecar launch path exists, but full installer integration for
+  a packaged Python sidecar artifact is not complete yet.
 - The installer does not bundle local AI models.
 - The app is still a desktop shell and preview UI.
 - There is no updater configuration.

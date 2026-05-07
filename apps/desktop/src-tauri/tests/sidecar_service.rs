@@ -1,6 +1,9 @@
 use std::{
+    env,
     io::{Read, Write},
     net::TcpListener,
+    path::PathBuf,
+    sync::Mutex,
     thread,
 };
 use worktrace_desktop_lib::commands::sidecar::{
@@ -11,88 +14,221 @@ use worktrace_desktop_lib::services::sidecar::{
     RecorderControlStatus, SessionEventsStatus, SidecarService, SidecarStatus,
 };
 
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
 #[test]
 fn default_sidecar_health_reports_missing_binary() {
-    let service = SidecarService;
+    with_sidecar_env(None, None, None, None, || {
+        let service = SidecarService;
 
-    let health = service.health();
+        let health = service.health();
 
-    assert_eq!(health.status, SidecarStatus::Missing);
-    assert_eq!(health.app_version, None);
-    assert_eq!(health.schema_version, None);
-    assert_eq!(
-        health.message,
-        "Local agent sidecar binary is not configured yet."
-    );
+        assert_eq!(health.status, SidecarStatus::Missing);
+        assert_eq!(health.app_version, None);
+        assert_eq!(health.schema_version, None);
+        assert_eq!(
+            health.message,
+            "Local agent sidecar binary is not configured yet."
+        );
+    });
 }
 
 #[test]
 fn start_reports_safe_missing_sidecar_state() {
-    let service = SidecarService;
+    with_sidecar_env(None, None, None, None, || {
+        let service = SidecarService;
 
-    let health = service.start();
+        let health = service.start();
 
-    assert_eq!(health.status, SidecarStatus::Missing);
-    assert_eq!(
-        health.message,
-        "Local agent sidecar binary is not configured yet."
-    );
+        assert_eq!(health.status, SidecarStatus::Missing);
+        assert_eq!(
+            health.message,
+            "Local agent sidecar binary is not configured yet."
+        );
+    });
 }
 
 #[test]
 fn stop_reports_safe_missing_sidecar_state() {
-    let service = SidecarService;
+    with_sidecar_env(None, None, None, None, || {
+        let service = SidecarService;
 
-    let health = service.stop();
+        let health = service.stop();
 
-    assert_eq!(health.status, SidecarStatus::Missing);
-    assert_eq!(health.message, "Local agent sidecar is not running.");
+        assert_eq!(health.status, SidecarStatus::Missing);
+        assert_eq!(health.message, "Local agent sidecar is not running.");
+    });
 }
 
 #[test]
 fn events_report_safe_unavailable_state_when_bridge_is_missing() {
-    let service = SidecarService;
+    with_sidecar_env(None, None, None, None, || {
+        let service = SidecarService;
 
-    let result = service.events("latest".to_string());
+        let result = service.events("latest".to_string());
 
-    assert_eq!(result.status, SessionEventsStatus::Unavailable);
-    assert!(result.events.is_empty());
+        assert_eq!(result.status, SessionEventsStatus::Unavailable);
+        assert!(result.events.is_empty());
+    });
 }
 
 #[test]
 fn command_exposes_safe_session_events_fallback() {
-    let result = get_session_events("latest".to_string());
+    with_sidecar_env(None, None, None, None, || {
+        let result = get_session_events("latest".to_string());
 
-    assert_eq!(result.status, SessionEventsStatus::Unavailable);
-    assert!(result.events.is_empty());
+        assert_eq!(result.status, SessionEventsStatus::Unavailable);
+        assert!(result.events.is_empty());
+    });
 }
 
 #[test]
 fn recorder_control_commands_return_safe_unavailable_state_when_bridge_is_missing() {
-    let start = start_recording_session(
-        "sess_control_001".to_string(),
-        "2026-05-06T09:14:00+05:30".to_string(),
-        Some("Desktop control".to_string()),
-        "standard".to_string(),
-    );
-    let pause = pause_recording_session(
-        "sess_control_001".to_string(),
-        "2026-05-06T09:15:00+05:30".to_string(),
-    );
-    let resume = resume_recording_session(
-        "sess_control_001".to_string(),
-        "2026-05-06T09:16:00+05:30".to_string(),
-    );
-    let stop = stop_recording_session(
-        "sess_control_001".to_string(),
-        "2026-05-06T09:17:00+05:30".to_string(),
-    );
+    with_sidecar_env(None, None, None, None, || {
+        let start = start_recording_session(
+            "sess_control_001".to_string(),
+            "2026-05-06T09:14:00+05:30".to_string(),
+            Some("Desktop control".to_string()),
+            "standard".to_string(),
+        );
+        let pause = pause_recording_session(
+            "sess_control_001".to_string(),
+            "2026-05-06T09:15:00+05:30".to_string(),
+        );
+        let resume = resume_recording_session(
+            "sess_control_001".to_string(),
+            "2026-05-06T09:16:00+05:30".to_string(),
+        );
+        let stop = stop_recording_session(
+            "sess_control_001".to_string(),
+            "2026-05-06T09:17:00+05:30".to_string(),
+        );
 
-    assert_eq!(start.status, RecorderControlStatus::Unavailable);
-    assert_eq!(pause.status, RecorderControlStatus::Unavailable);
-    assert_eq!(resume.status, RecorderControlStatus::Unavailable);
-    assert_eq!(stop.status, RecorderControlStatus::Unavailable);
-    assert!(start.session.is_none());
+        assert_eq!(start.status, RecorderControlStatus::Unavailable);
+        assert_eq!(pause.status, RecorderControlStatus::Unavailable);
+        assert_eq!(resume.status, RecorderControlStatus::Unavailable);
+        assert_eq!(stop.status, RecorderControlStatus::Unavailable);
+        assert!(start.session.is_none());
+    });
+}
+
+#[test]
+fn health_loads_from_configured_localhost_port_without_manual_sidecar_url() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        respond_once(
+            listener,
+            "GET /health HTTP/1.1",
+            r#"{"app_name":"worktrace-local-agent","app_version":"0.0.0","schema_version":"003_ocr_results.sql","status":"ok"}"#,
+        );
+    });
+
+    with_sidecar_env(None, Some(&port.to_string()), None, None, || {
+        let service = SidecarService;
+        let health = service.health();
+
+        assert_eq!(health.status, SidecarStatus::Healthy);
+        assert_eq!(health.app_version.as_deref(), Some("0.0.0"));
+        assert_eq!(
+            health.schema_version.as_deref(),
+            Some("003_ocr_results.sql")
+        );
+    });
+    handle.join().expect("join local server");
+}
+
+#[test]
+fn events_use_configured_localhost_port_without_manual_sidecar_url() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        respond_once(
+            listener,
+            "GET /sessions/latest/events HTTP/1.1",
+            r#"{"events":[]}"#,
+        );
+    });
+
+    with_sidecar_env(None, Some(&port.to_string()), None, None, || {
+        let service = SidecarService;
+        let result = service.events("latest".to_string());
+
+        assert_eq!(result.status, SessionEventsStatus::Available);
+        assert!(result.events.is_empty());
+    });
+    handle.join().expect("join local server");
+}
+
+#[test]
+fn start_uses_existing_configured_sidecar_health_when_available() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test server");
+    let port = listener.local_addr().expect("read local addr").port();
+    let handle = thread::spawn(move || {
+        respond_once(
+            listener,
+            "GET /health HTTP/1.1",
+            r#"{"app_name":"worktrace-local-agent","app_version":"0.0.0","schema_version":"003_ocr_results.sql","status":"ok"}"#,
+        );
+    });
+
+    with_sidecar_env(None, Some(&port.to_string()), None, None, || {
+        let service = SidecarService;
+        let health = service.start();
+
+        assert_eq!(health.status, SidecarStatus::Healthy);
+        assert_eq!(health.message, "Local agent sidecar is healthy.");
+    });
+    handle.join().expect("join local server");
+}
+
+#[test]
+fn start_reports_safe_missing_when_configured_sidecar_binary_is_missing() {
+    with_sidecar_env(
+        None,
+        Some("8765"),
+        Some("C:/worktrace/missing-sidecar.exe"),
+        None,
+        || {
+            let service = SidecarService;
+            let health = service.start();
+
+            assert_eq!(health.status, SidecarStatus::Missing);
+            assert_eq!(
+                health.message,
+                "Local agent sidecar binary is not configured yet."
+            );
+        },
+    );
+}
+
+#[test]
+fn configured_sidecar_process_can_start_and_stop_safely() {
+    let Some((binary, args)) = sleeper_command() else {
+        return;
+    };
+
+    with_sidecar_env(
+        None,
+        Some("65534"),
+        Some(binary.to_string_lossy().as_ref()),
+        Some(args),
+        || {
+            let service = SidecarService;
+            let started = service.start();
+
+            assert_eq!(started.status, SidecarStatus::Unhealthy);
+            assert_eq!(
+                started.message,
+                "Local agent sidecar process started; health check is still pending."
+            );
+
+            let stopped = service.stop();
+
+            assert_eq!(stopped.status, SidecarStatus::Missing);
+            assert_eq!(stopped.message, "Local agent sidecar was stopped.");
+        },
+    );
 }
 
 #[test]
@@ -251,4 +387,94 @@ fn events_allow_latest_session_lookup_through_sidecar() {
 
     assert_eq!(result.status, SessionEventsStatus::Available);
     assert!(result.events.is_empty());
+}
+
+fn respond_once(listener: TcpListener, expected_path: &str, body: &str) {
+    let (mut stream, _) = listener.accept().expect("accept sidecar request");
+    let mut request = [0_u8; 1024];
+    let read_count = stream.read(&mut request).expect("read sidecar request");
+    let request_text = String::from_utf8_lossy(&request[..read_count]);
+    assert!(request_text.starts_with(expected_path));
+
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    stream
+        .write_all(response.as_bytes())
+        .expect("write response");
+}
+
+fn sleeper_command() -> Option<(PathBuf, &'static str)> {
+    if cfg!(windows) {
+        let system_root = env::var("SystemRoot").ok()?;
+        let powershell = PathBuf::from(system_root)
+            .join("System32")
+            .join("WindowsPowerShell")
+            .join("v1.0")
+            .join("powershell.exe");
+        if powershell.is_file() {
+            return Some((powershell, "-NoProfile -Command Start-Sleep -Seconds 30"));
+        }
+    }
+
+    let sleep = PathBuf::from("/bin/sleep");
+    if sleep.is_file() {
+        return Some((sleep, "30"));
+    }
+
+    None
+}
+
+fn with_sidecar_env(
+    url: Option<&str>,
+    port: Option<&str>,
+    binary: Option<&str>,
+    args: Option<&str>,
+    run: impl FnOnce(),
+) {
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous_url = env::var("WORKTRACE_SIDECAR_URL").ok();
+    let previous_port = env::var("WORKTRACE_SIDECAR_PORT").ok();
+    let previous_binary = env::var("WORKTRACE_SIDECAR_BIN").ok();
+    let previous_args = env::var("WORKTRACE_SIDECAR_ARGS").ok();
+
+    match url {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_URL", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_URL"),
+    }
+    match port {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_PORT", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_PORT"),
+    }
+    match binary {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_BIN", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_BIN"),
+    }
+    match args {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_ARGS", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_ARGS"),
+    }
+
+    run();
+
+    match previous_url {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_URL", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_URL"),
+    }
+    match previous_port {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_PORT", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_PORT"),
+    }
+    match previous_binary {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_BIN", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_BIN"),
+    }
+    match previous_args {
+        Some(value) => env::set_var("WORKTRACE_SIDECAR_ARGS", value),
+        None => env::remove_var("WORKTRACE_SIDECAR_ARGS"),
+    }
 }

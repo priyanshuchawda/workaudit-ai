@@ -23,10 +23,9 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "## Current Limitations" in readme
     assert "desktop session dashboard foundation" in readme
     assert "desktop recorder lifecycle controls for a configured local sidecar" in readme
+    assert "configured localhost sidecar launch/stop abstraction" in readme
     assert "real Windows active-window polling" in readme
-    assert (
-        "Tauri recorder and event bridge still require a configured localhost sidecar URL" in readme
-    )
+    assert "configured localhost sidecar URL or configured local sidecar binary/port" in readme
     assert "real Windows screenshot capture" in readme
     assert "metadata-only file watcher capture" in readme
     assert "explicit safe terminal command ingestion" in readme
@@ -35,7 +34,7 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "OCR and model runtimes are still not live" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "desktop export commands" in readme
-    assert "packaged sidecar launch" in readme
+    assert "bundled sidecar packaging" in readme
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme
 
@@ -68,6 +67,8 @@ def test_packaging_docs_and_desktop_script_define_windows_nsis_build() -> None:
     assert "pnpm --dir apps/desktop package:windows" in packaging_doc
     assert "not code-signed" in packaging_doc
     assert "does not bundle the Python sidecar yet" in packaging_doc
+    assert "configured sidecar launch path exists" in packaging_doc
+    assert "WORKTRACE_DB_PATH" in packaging_doc
 
 
 def test_demo_script_is_truthful_about_current_implemented_demo() -> None:

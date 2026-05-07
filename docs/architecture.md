@@ -1,6 +1,6 @@
 # Architecture
 
-Initial Phase 0 placeholder. See `../plan.md` for the authoritative roadmap and constraints.
+See `../plan.md` for the authoritative roadmap and constraints.
 
 The planned architecture is:
 
@@ -14,27 +14,36 @@ React UI
   -> reports/exports
 ```
 
-Phase 0 does not implement this runtime yet. This file records the intended boundaries so future implementation issues do not mix UI, native commands, sidecar work, storage, and AI behavior in one change.
+The repo now implements the first real recorder signals, but the architecture is
+still local-first and evidence-first: native desktop commands talk only to a
+localhost sidecar, the sidecar persists raw evidence into SQLite, and AI/runtime
+features remain separate from capture workers.
 
 ## Current implementation map
 
 ```mermaid
 flowchart LR
-  A["React shell and previews"] --> B["Typed Tauri client"]
-  B --> C["Rust sidecar health commands"]
-  C --> D["Python 3.13 local-agent foundations"]
-  D --> E["SQLite WAL and local artifacts"]
-  E --> F["Deterministic timeline and exports"]
-  F --> G["Golden evals and sample reports"]
+  A["React dashboard and recorder controls"] --> B["Typed Tauri client"]
+  B --> C["Rust sidecar health, event, recorder, and launch commands"]
+  C --> D["Python 3.13 FastAPI local agent"]
+  D --> E["Active-window, screenshot, file, and explicit terminal workers"]
+  E --> F["SQLite WAL and local artifacts"]
+  F --> G["Deterministic timeline and exports"]
+  G --> H["Golden evals and sample reports"]
 ```
 
 Implemented today:
 
 - desktop shell and preview UI
-- typed sidecar health checks
-- Python FastAPI health foundation
+- typed sidecar health, event, recorder-control, and configured launch/stop checks
+- Python FastAPI health and session-control foundation
 - SQLite WAL migrations and repositories
 - fake session validation and export
+- real Windows active-window polling
+- real Windows screenshot capture and artifact metadata
+- metadata-only configured-folder file watching
+- explicit safe terminal command ingestion
+- privacy redaction and private-mode suppression across implemented capture workers
 - deterministic timeline, Markdown export, and report foundations
 - local model availability fallback states
 - selective OCR/audio/embedding/vision contracts without real model loading
@@ -42,8 +51,10 @@ Implemented today:
 
 Not implemented yet:
 
-- live Windows recorder loop
-- bundled Python sidecar installer
+- bundled Python sidecar installer artifact
+- desktop export/screenshot-management commands
+- desktop privacy center and configurable blocklist UI
 - production signing or updater
 - real model runtime downloads
-- end-to-end live capture demo
+- live OCR/model runtime integrations
+- real Windows performance benchmark

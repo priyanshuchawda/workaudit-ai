@@ -4,12 +4,23 @@ use std::{
     env,
     io::{Read, Write},
     net::{TcpStream, ToSocketAddrs},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    sync::{Mutex, OnceLock},
     time::Duration,
 };
 
 const MISSING_MESSAGE: &str = "Local agent sidecar binary is not configured yet.";
 const NOT_RUNNING_MESSAGE: &str = "Local agent sidecar is not running.";
 const SIDECAR_URL_ENV: &str = "WORKTRACE_SIDECAR_URL";
+const SIDECAR_PORT_ENV: &str = "WORKTRACE_SIDECAR_PORT";
+const SIDECAR_BIN_ENV: &str = "WORKTRACE_SIDECAR_BIN";
+const SIDECAR_ARGS_ENV: &str = "WORKTRACE_SIDECAR_ARGS";
+const DEFAULT_SIDECAR_PORT: u16 = 8765;
+#[cfg(windows)]
+const BUNDLED_SIDECAR_NAME: &str = "worktrace-local-agent.exe";
+#[cfg(not(windows))]
+const BUNDLED_SIDECAR_NAME: &str = "worktrace-local-agent";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(2);
 const REDACTION_TOKEN: &str = "[REDACTED]";
 const SECRET_FRAGMENTS: &[&str] = &[
@@ -110,24 +121,52 @@ struct SidecarRawEvent {
     metadata: Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct SidecarHealthResponse {
+    app_version: String,
+    schema_version: String,
+    status: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct SidecarService;
 
 impl SidecarService {
     pub fn health(&self) -> SidecarHealth {
-        missing_health(MISSING_MESSAGE)
+        let Some(base_url) = configured_base_url() else {
+            return missing_health(MISSING_MESSAGE);
+        };
+
+        self.health_from_base_url(&base_url)
     }
 
     pub fn start(&self) -> SidecarHealth {
-        missing_health(MISSING_MESSAGE)
+        let Some(base_url) = configured_base_url() else {
+            return missing_health(MISSING_MESSAGE);
+        };
+
+        let health = self.health_from_base_url(&base_url);
+        if health.status == SidecarStatus::Healthy {
+            return health;
+        }
+
+        let Some(binary_path) = configured_sidecar_binary() else {
+            return missing_health(MISSING_MESSAGE);
+        };
+
+        start_managed_sidecar(binary_path)
     }
 
     pub fn stop(&self) -> SidecarHealth {
+        if stop_managed_sidecar() {
+            return missing_health("Local agent sidecar was stopped.");
+        }
+
         missing_health(NOT_RUNNING_MESSAGE)
     }
 
     pub fn events(&self, session_id: String) -> SessionEventsResult {
-        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+        let Some(base_url) = configured_base_url() else {
             return unavailable_events();
         };
 
@@ -141,7 +180,7 @@ impl SidecarService {
         title: Option<String>,
         privacy_mode: String,
     ) -> RecorderControlResult {
-        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+        let Some(base_url) = configured_base_url() else {
             return unavailable_recorder_control();
         };
 
@@ -187,7 +226,7 @@ impl SidecarService {
         session_id: String,
         paused_at: String,
     ) -> RecorderControlResult {
-        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+        let Some(base_url) = configured_base_url() else {
             return unavailable_recorder_control();
         };
 
@@ -217,7 +256,7 @@ impl SidecarService {
         session_id: String,
         resumed_at: String,
     ) -> RecorderControlResult {
-        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+        let Some(base_url) = configured_base_url() else {
             return unavailable_recorder_control();
         };
 
@@ -247,7 +286,7 @@ impl SidecarService {
         session_id: String,
         stopped_at: String,
     ) -> RecorderControlResult {
-        let Ok(base_url) = env::var(SIDECAR_URL_ENV) else {
+        let Some(base_url) = configured_base_url() else {
             return unavailable_recorder_control();
         };
 
@@ -301,6 +340,28 @@ impl SidecarService {
         }
     }
 
+    pub fn health_from_base_url(&self, base_url: &str) -> SidecarHealth {
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unhealthy_health("Local agent sidecar URL must use localhost.");
+        };
+        let Ok(body) = request_local_json(&endpoint, "GET", "/health", None) else {
+            return unhealthy_health("Local agent sidecar health check failed.");
+        };
+        let Ok(response) = serde_json::from_str::<SidecarHealthResponse>(&body) else {
+            return unhealthy_health("Local agent sidecar health response was invalid.");
+        };
+        if response.status != "ok" {
+            return unhealthy_health("Local agent sidecar reported unhealthy status.");
+        }
+
+        SidecarHealth {
+            status: SidecarStatus::Healthy,
+            app_version: Some(redact_text(&response.app_version)),
+            schema_version: Some(redact_text(&response.schema_version)),
+            message: "Local agent sidecar is healthy.".to_string(),
+        }
+    }
+
     fn post_session_control(
         &self,
         base_url: &str,
@@ -332,6 +393,24 @@ fn missing_health(message: &str) -> SidecarHealth {
         app_version: None,
         schema_version: None,
         message: message.to_string(),
+    }
+}
+
+fn unhealthy_health(message: &str) -> SidecarHealth {
+    SidecarHealth {
+        status: SidecarStatus::Unhealthy,
+        app_version: None,
+        schema_version: None,
+        message: message.to_string(),
+    }
+}
+
+fn starting_health() -> SidecarHealth {
+    SidecarHealth {
+        status: SidecarStatus::Unhealthy,
+        app_version: None,
+        schema_version: None,
+        message: "Local agent sidecar process started; health check is still pending.".to_string(),
     }
 }
 
@@ -462,6 +541,112 @@ impl LocalHttpEndpoint {
             port,
         })
     }
+}
+
+fn configured_base_url() -> Option<String> {
+    if let Ok(base_url) = env::var(SIDECAR_URL_ENV) {
+        if LocalHttpEndpoint::parse(&base_url).is_some() {
+            return Some(base_url);
+        }
+        return None;
+    }
+
+    let port = configured_sidecar_port()?;
+    Some(format!("http://127.0.0.1:{port}"))
+}
+
+fn configured_sidecar_port() -> Option<u16> {
+    if let Ok(port) = env::var(SIDECAR_PORT_ENV) {
+        return port.parse::<u16>().ok();
+    }
+    if configured_sidecar_binary().is_some() {
+        return Some(DEFAULT_SIDECAR_PORT);
+    }
+    None
+}
+
+fn configured_sidecar_binary() -> Option<PathBuf> {
+    if let Ok(path) = env::var(SIDECAR_BIN_ENV) {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
+    bundled_sidecar_binary()
+}
+
+fn bundled_sidecar_binary() -> Option<PathBuf> {
+    let app_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+    let candidates = [
+        app_dir.join("sidecars").join(BUNDLED_SIDECAR_NAME),
+        app_dir.join(BUNDLED_SIDECAR_NAME),
+    ];
+
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+fn start_managed_sidecar(binary_path: PathBuf) -> SidecarHealth {
+    let process_lock = managed_sidecar_process();
+    let Ok(mut process) = process_lock.lock() else {
+        return unhealthy_health("Local agent sidecar process state is unavailable.");
+    };
+
+    if let Some(child) = process.as_mut() {
+        match child.try_wait() {
+            Ok(None) => return starting_health(),
+            Ok(Some(_)) | Err(_) => {
+                *process = None;
+            }
+        }
+    }
+
+    let mut command = Command::new(binary_path);
+    command
+        .args(configured_sidecar_args())
+        .env("WORKTRACE_SIDECAR_HOST", "127.0.0.1")
+        .env(
+            "WORKTRACE_SIDECAR_PORT",
+            configured_sidecar_port()
+                .unwrap_or(DEFAULT_SIDECAR_PORT)
+                .to_string(),
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    let Ok(child) = command.spawn() else {
+        return unhealthy_health("Local agent sidecar process could not be started.");
+    };
+
+    *process = Some(child);
+    starting_health()
+}
+
+fn stop_managed_sidecar() -> bool {
+    let process_lock = managed_sidecar_process();
+    let Ok(mut process) = process_lock.lock() else {
+        return false;
+    };
+    let Some(mut child) = process.take() else {
+        return false;
+    };
+
+    let _ = child.kill();
+    let _ = child.wait();
+    true
+}
+
+fn managed_sidecar_process() -> &'static Mutex<Option<Child>> {
+    static PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+    PROCESS.get_or_init(|| Mutex::new(None))
+}
+
+fn configured_sidecar_args() -> Vec<String> {
+    env::var(SIDECAR_ARGS_ENV)
+        .ok()
+        .map(|args| args.split_whitespace().map(str::to_string).collect())
+        .unwrap_or_default()
 }
 
 fn request_local_json(

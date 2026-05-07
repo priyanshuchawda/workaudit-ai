@@ -19,6 +19,8 @@ For #87, the default report model config is Gemma 4 E2B-it Q4. WorkTrace maps it
 
 For #89, WorkTrace can manually install a user-supplied local model file into the cache after disk-space, size, and checksum checks, and can uninstall the exact cached file. This does not perform network downloads, start model servers, import heavy runtime packages, or load models during recording.
 
+For #91, WorkTrace adds a localhost-only Qwen3 embedding runtime adapter for retrieval/grouping helpers. The adapter redacts text before transport, validates response dimensions, and can be fully tested with fake transport. It still does not run during recording, does not auto-download models, and does not allow embeddings to bypass evidence-ID claim discipline.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

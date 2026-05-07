@@ -9,7 +9,7 @@ MVP model policy:
 - normal recording must work without models installed
 - AI report generation runs after session stop or manual request
 - selective OCR guardrails may run only on high-value screenshots when explicitly invoked
-- PaddleOCR, vision, audio transcription, embeddings, and deep analysis are deferred as bundled runtimes
+- PaddleOCR, vision, audio transcription, and deep analysis are deferred as bundled runtimes
 
 This project should never require a model for basic recording, raw timeline review, or local export.
 
@@ -33,6 +33,16 @@ Local report runtime policy:
 - default report context budget is capped at 8192 tokens, with deep mode capped at 16384 tokens until benchmarks justify more
 - prompts are capped before transport and oversized prompts fail safely
 - model downloads, model server startup, embeddings, audio, and vision are out of scope for the first report runtime adapter
+
+Embedding runtime policy:
+
+- embeddings are retrieval/grouping helpers only, not source-of-truth evidence
+- final report claims still require cited evidence IDs from timeline/session data
+- Qwen3 embedding runtime uses localhost-only adapter calls with fakeable transport tests
+- embedding payloads are redacted before transport
+- no embedding runtime/model loading during normal recording
+- no remote embedding endpoint or cloud vector database by default
+- vector storage decision: SQLite vectors first for smaller local indexes, local file index later only when benchmarked scale requires it
 
 Default report model config:
 

@@ -1,18 +1,48 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 23:00 local / 2026-05-07 17:30 UTC
+2026-05-08 00:35 local / 2026-05-07 19:05 UTC
 
 ## Current Issue
-#89 — Real model download manager
+#91 — Embedding runtime: Qwen3-Embedding-0.6B
 
 ## Current Branch
-feat/89-real-model-download-manager
+feat/91-qwen-embedding-runtime-v2
 
 ## Current Phase
-Diff review before PR
+Final diff review and PR preparation for #91
 
 ## Completed Since Last Update
+- Full #91 quality gate passed after implementation updates:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest` (215 passed)
+  - `pnpm --dir packages/shared typecheck`
+  - `pnpm --dir packages/shared test` (14 passed)
+  - `pnpm --dir apps/desktop typecheck`
+  - `pnpm --dir apps/desktop lint`
+  - `pnpm --dir apps/desktop test` (28 passed)
+  - `pnpm --dir apps/desktop build`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - `cargo test --workspace` (31 passed)
+- Focused #91 checks passed:
+  - `uv run --python 3.13 pytest tests/test_qwen_embedding_runtime.py -q` (9 passed)
+  - `uv run --python 3.13 pytest tests/test_model_cache.py -q` (15 passed)
+  - `uv run --python 3.13 pytest tests/test_model_availability.py -q` (10 passed)
+  - `uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py -q` (6 passed)
+- Updated README/model-routing/model policy docs for #91 embedding adapter scope, vector-storage decision, and no-auto-download/no-recording-load limits.
+- Implemented `worktrace_agent.ai.qwen_embedding_runtime` with a localhost-only fakeable `/embed` adapter, response validation, redacted input payloads, and a `QwenCommandEmbeddingModel` bridge for existing command-clustering flows.
+- Added a metadata-only Qwen embedding manifest with explicit model/cache policy for `Qwen/Qwen3-Embedding-0.6B`, plus availability/cache config builders.
+- Confirmed green state with `uv run --python 3.13 pytest tests/test_qwen_embedding_runtime.py -q` (9 passed).
+- Added red tests in `services/local-agent/tests/test_qwen_embedding_runtime.py` for localhost-only embedding runtime, redacted payloads, evidence-cited clustering, unavailable fallback, cache spec metadata, and no heavy imports.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_qwen_embedding_runtime.py -q` failing on missing `worktrace_agent.ai.qwen_embedding_runtime`.
+- Merged #89 via PR #90 and confirmed the issue is closed.
+- Created #91: Embedding runtime: Qwen3-Embedding-0.6B.
+- Started branch `feat/91-qwen-embedding-runtime-v2` from updated `main`.
+- Re-read required docs for model/runtime constraints, including Qwen embedding docs and model policies.
+- Wrote implementation plan at `docs/superpowers/plans/2026-05-07-qwen3-embedding-runtime.md`.
 - #69 export/review UX merged via PR #70.
 - #71 screenshot metadata UI merged via PR #72.
 - #73 session browser/delete/open folder merged via PR #74.

@@ -11,6 +11,7 @@ from worktrace_agent.capture.active_window import (
 from worktrace_agent.db.connection import initialize_database
 from worktrace_agent.db.raw_events_repository import list_raw_events
 from worktrace_agent.db.session_state_repository import start_session, stop_session
+from worktrace_agent.privacy.policy import PrivacyPolicy
 from worktrace_agent.privacy.redaction import PRIVACY_TEST_CORPUS, REDACTION_TOKEN
 
 SESSION_ID = "sess_live_window_001"
@@ -139,6 +140,30 @@ def test_provider_error_does_not_corrupt_session(tmp_path: Path) -> None:
         assert saved is None
         assert recorder.last_error == "active_window_provider_error"
         assert row["status"] == session.status.value
+        assert list_raw_events(connection, SESSION_ID) == []
+    finally:
+        connection.close()
+
+
+def test_active_window_recorder_respects_private_mode_and_blocklist(tmp_path: Path) -> None:
+    connection = initialize_database(tmp_path / "worktrace.sqlite")
+    try:
+        start_session(connection, session_id=SESSION_ID, started_at=STARTED_AT)
+        private_recorder = ActiveWindowRecorder(
+            connection=connection,
+            session_id=SESSION_ID,
+            provider=SequenceActiveWindowProvider([snapshot(app="VS Code", process="Code.exe")]),
+            privacy_policy=PrivacyPolicy(private_mode=True),
+        )
+        blocklisted_recorder = ActiveWindowRecorder(
+            connection=connection,
+            session_id=SESSION_ID,
+            provider=SequenceActiveWindowProvider([snapshot(app="Chrome", process="chrome.exe")]),
+            privacy_policy=PrivacyPolicy(blocklist=("chrome.exe",)),
+        )
+
+        assert private_recorder.poll_once() is None
+        assert blocklisted_recorder.poll_once() is None
         assert list_raw_events(connection, SESSION_ID) == []
     finally:
         connection.close()

@@ -29,6 +29,18 @@ class PrivacyPolicy:
             return False
         return not self.allowlist or normalized_app in allowed_apps
 
+    def should_capture_app_identity(self, *, app_name: str, process_name: str) -> bool:
+        if self.private_mode:
+            return False
+
+        normalized_names = {normalize_name(app_name), normalize_name(process_name)}
+        blocklisted_apps = {normalize_name(app) for app in self.blocklist}
+        if normalized_names & blocklisted_apps:
+            return False
+
+        allowed_apps = {normalize_name(app) for app in self.allowlist}
+        return not allowed_apps or bool(normalized_names & allowed_apps)
+
     def should_capture_source(self, source: str) -> bool:
         if self.private_mode:
             return False

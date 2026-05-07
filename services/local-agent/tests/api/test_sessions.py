@@ -121,6 +121,38 @@ def test_start_pause_resume_stop_session_control_flow(tmp_path: Path) -> None:
     assert stop_response.json()["status"] == "stopped"
 
 
+def test_private_mode_session_suppresses_capture_workers(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            screenshot_provider=StaticScreenshotProvider(),
+            recorder_poll_interval_seconds=0.01,
+            screenshot_interval_seconds=0.01,
+        )
+    )
+
+    start_response = client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_private_001",
+            "started_at": "2026-05-06T09:14:00+05:30",
+            "privacy_mode": "private",
+        },
+    )
+    stop_response = client.post(
+        "/sessions/sess_api_private_001/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+    events_response = client.get("/sessions/sess_api_private_001/events")
+    screenshots_response = client.get("/sessions/sess_api_private_001/screenshots")
+
+    assert start_response.status_code == 200
+    assert stop_response.status_code == 200
+    assert events_response.json()["events"] == []
+    assert screenshots_response.json()["screenshots"] == []
+
+
 def test_session_start_stops_file_watcher_when_roots_are_configured(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     file_path = project_root / "src" / "app.py"

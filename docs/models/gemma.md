@@ -14,6 +14,11 @@ Current status:
 - Quantization assumption for the default config: `Q4_0`.
 - Default report context budget: 8192 tokens.
 - First maximum tested budget target: 16384 tokens.
+- Manual deep-mode config: Gemma 4 E4B-it Q4.
+- Deep-mode Ollama-style tag: `gemma4:e4b`.
+- Deep-mode Hugging Face model ID: `google/gemma-4-E4B-it`.
+- Deep-mode context budget: 16384 tokens.
+- Deep mode is manual-only, never the default, disabled during recording, and falls back to E2B when E4B is unavailable or memory pressure is high.
 - Default output cap: 512 tokens.
 - Default temperature: 0.2.
 - Automatic downloads are disabled.

@@ -1,18 +1,33 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 01:13 local / 2026-05-07 19:43 UTC
+2026-05-08 01:20 local / 2026-05-07 19:50 UTC
 
 ## Current Issue
-#93 — Real PaddleOCR adapter
+#95 — Gemma E4B deep mode
 
 ## Current Branch
-feat/93-real-paddleocr-adapter
+feat/95-gemma-e4b-deep-mode
 
 ## Current Phase
-PR preparation for #93 after full quality gate
+PR preparation for #95 after full quality gate
 
 ## Completed Since Last Update
+- Merged #93 via PR #94 and confirmed issue #93 is closed.
+- Created #95: Gemma E4B deep mode.
+- Started branch `feat/95-gemma-e4b-deep-mode` from updated `main`.
+- Read Gemma/model runtime docs for #95, including `docs/gemma4.md`, `docs/models/gemma.md`, `docs/models/local_model_runtime.md`, and `docs/model-routing.md`.
+- Wrote the #95 implementation plan at `docs/superpowers/plans/2026-05-08-gemma-e4b-deep-mode.md`.
+- Added red tests for E4B manifest metadata, manual-only deep selection, fallback reasons, context caps, missing-model state, and no heavy imports.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_gemma_model_manifest.py -q` failing on missing `DEEP_GEMMA_REPORT_MODEL`.
+- Implemented `DEEP_GEMMA_REPORT_MODEL`, `GemmaReportModelSelection`, and `select_gemma_report_model` with manual-only, recording, memory-pressure, and availability guardrails.
+- Updated README/model docs for E4B manual deep-mode metadata, 16K context cap, and E2B fallback behavior.
+- Focused #95 checks passed:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest tests/test_gemma_model_manifest.py tests/test_local_report_runtime.py tests/test_model_availability.py tests/test_portfolio_claim_discipline.py -q` (47 passed)
+- Full #95 quality gate passed across Python, shared, desktop, and Rust.
 - Added #93 regression coverage for the documented PaddleOCR `predict()` API, PP-OCR constructor options, and `rec_texts`/`rec_scores` output parsing from `docs/pp_ocr.md`.
 - Updated the PaddleOCR adapter to use the documented `predict()` path, support current `rec_texts`/`rec_scores` and older tuple result shapes, and keep temporary screenshot files cleaned up safely.
 - Confirmed PaddleOCR is not installed in this local environment with a lightweight `importlib.util.find_spec("paddleocr")` check, so no real OCR smoke was run.
@@ -140,13 +155,11 @@ PR preparation for #93 after full quality gate
 - `docs/AGENT_STATE.md`
 - `README.md`
 - `docs/model-routing.md`
+- `docs/models/gemma.md`
 - `docs/models/local_model_runtime.md`
-- `docs/models/ocr.md`
-- `docs/superpowers/plans/2026-05-08-real-paddleocr-adapter.md`
-- `services/local-agent/src/worktrace_agent/capture/ocr_runtime.py`
-- `services/local-agent/src/worktrace_agent/capture/ocr_worker.py`
-- `services/local-agent/tests/test_ocr_runtime.py`
-- `services/local-agent/tests/test_selective_ocr_worker.py`
+- `docs/superpowers/plans/2026-05-08-gemma-e4b-deep-mode.md`
+- `services/local-agent/src/worktrace_agent/ai/gemma_manifest.py`
+- `services/local-agent/tests/test_gemma_model_manifest.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -309,15 +322,15 @@ PR preparation for #93 after full quality gate
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #93 does not change sidecar packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #93 does not change installer packaging.
-- Real PaddleOCR smoke — not run; `importlib.util.find_spec("paddleocr")` returned `False` in this environment, and this PR does not install/download OCR packages or model files.
+- `pnpm --dir apps/desktop package:sidecar` — not run; #95 does not change sidecar packaging.
+- `pnpm --dir apps/desktop package:windows` — not run; #95 does not change installer packaging.
+- Real Gemma/Ollama E4B smoke — not run; #95 adds metadata/selection guardrails only and does not download, install, start, or load models.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Stage scoped #93 files, commit, push, and open PR.
+Run final diff/whitespace checks, stage scoped #95 files, commit, push, and open PR.
 
 ## Do Not Forget
 - No OCR before OCR issue.

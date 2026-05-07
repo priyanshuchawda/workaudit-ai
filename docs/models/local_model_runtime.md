@@ -23,6 +23,8 @@ For #91, WorkTrace adds a localhost-only Qwen3 embedding runtime adapter for ret
 
 For #93, WorkTrace adds an optional real PaddleOCR adapter path behind selective-worker guardrails. Runtime binding is lazy, unavailable runtimes degrade safely, and per-session OCR jobs are capped so OCR cannot become continuous capture.
 
+For #95, WorkTrace adds manual-only Gemma 4 E4B-it Q4 deep-mode metadata and selection guardrails. E4B is never the default, is disabled during recording, falls back to E2B when memory pressure is high or E4B is unavailable, and remains capped at 16384 context tokens until benchmark evidence justifies more.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

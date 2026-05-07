@@ -37,6 +37,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "selective OCR runtime guardrails" in readme
     assert "PaddleOCR is not bundled, downloaded, or required" in readme
     assert "no real OCR smoke has been run" in readme
+    assert "metadata-only model cache manager" in readme
+    assert "does not perform network downloads or load models" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "deterministic Markdown/raw JSON export review" in readme
     assert "AI report panel is intentionally unavailable" in readme

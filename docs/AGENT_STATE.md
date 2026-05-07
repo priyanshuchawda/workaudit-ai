@@ -1,13 +1,13 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 17:15 local / 2026-05-07 11:45 UTC
+2026-05-07 17:28 local / 2026-05-07 11:58 UTC
 
 ## Current Issue
-#79 — Selective OCR runtime
+#81 — Model download/cache manager
 
 ## Current Branch
-feat/79-selective-ocr-runtime
+feat/81-model-download-cache-manager
 
 ## Current Phase
 PR
@@ -34,24 +34,23 @@ PR
 - Updated README, architecture, and model-routing docs for selective OCR guardrails and non-bundled PaddleOCR limitations.
 - Updated `.gitignore` so `docs/models/*.md` policy docs are tracked while model artifact files remain ignored.
 - Ran the full #79 local quality gate successfully.
+- Merged #79 via PR #80 and confirmed the issue is closed.
+- Created #81: Model download/cache manager.
+- Started branch `feat/81-model-download-cache-manager`.
+- Wrote implementation plan at `docs/superpowers/plans/2026-05-07-model-download-cache-manager.md`.
+- Added red tests for model cache states, local cache paths, disk-space checks, checksum validation, and no heavy model imports.
+- Implemented metadata-only model cache manager with no download or runtime loading path.
+- Updated README and model policy docs for metadata-only cache behavior and no automatic model downloads.
+- Ran the full #81 local quality gate successfully.
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
-- `docs/models/model_download_policy.md`
-- `docs/models/ocr.md`
-- `docs/models/local_model_runtime.md`
-- `docs/models/gemma.md`
-- `docs/models/qwen.md`
-- `docs/models/embedding.md`
-- `docs/superpowers/plans/2026-05-07-selective-ocr-runtime.md`
-- `services/local-agent/tests/test_selective_ocr_worker.py`
-- `services/local-agent/tests/test_ocr_runtime.py`
-- `services/local-agent/src/worktrace_agent/capture/ocr_worker.py`
-- `services/local-agent/src/worktrace_agent/capture/ocr_runtime.py`
-- `.gitignore`
+- `docs/superpowers/plans/2026-05-07-model-download-cache-manager.md`
+- `services/local-agent/tests/test_model_cache.py`
+- `services/local-agent/src/worktrace_agent/ai/model_cache.py`
 - `README.md`
-- `docs/architecture.md`
-- `docs/model-routing.md`
+- `docs/models/model_download_policy.md`
+- `docs/models/local_model_runtime.md`
 - `services/local-agent/tests/test_portfolio_claim_discipline.py`
 
 ## Tests Run
@@ -89,16 +88,32 @@ PR
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 28 Rust integration tests.
 - `git diff --check` — passed.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_model_cache.py -q` — failed as expected because `worktrace_agent.ai.model_cache` was not implemented yet.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_model_cache.py -q` — passed, 8 tests.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py tests/test_model_cache.py -q` — passed, 14 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed, reformatted changed Python files.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — passed.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 173 tests.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed, 14 tests.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop test` — passed, 23 tests.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 28 Rust integration tests.
 
 ## Tests Not Run
-- Real PaddleOCR smoke — not run because PaddleOCR is not a project dependency and #79 intentionally adds no model/package downloads.
-- `pnpm --dir apps/desktop package:windows` — not run because #79 changed backend OCR runtime guardrails and docs, not installer packaging.
+- Real model download smoke — not run because #81 intentionally adds no network download path.
+- `pnpm --dir apps/desktop package:windows` — not run because #81 changed backend model-cache metadata and docs, not installer packaging.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Commit the #79 changes, push `feat/79-selective-ocr-runtime`, open a PR, and wait for GitHub checks before merging.
+Commit the #81 changes, push `feat/81-model-download-cache-manager`, open a PR, and wait for GitHub checks before merging.
 
 ## Do Not Forget
 - No OCR before OCR issue.

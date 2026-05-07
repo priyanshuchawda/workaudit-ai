@@ -6,6 +6,7 @@ from worktrace_agent.domain.session_state import (
     SessionStatus,
     SessionTransitionError,
     build_recording_session,
+    require_iso_datetime,
     transition_session,
 )
 
@@ -77,6 +78,24 @@ def pause_session(
     paused = transition_session(session, status=SessionStatus.PAUSED, occurred_at=None)
     _persist_status(connection, paused)
     return paused
+
+
+def resume_session(
+    connection: sqlite3.Connection,
+    *,
+    session_id: str,
+    occurred_at: str,
+) -> SessionRecord:
+    session = _require_session(connection, session_id)
+    if session.status is SessionStatus.RECORDING:
+        return session
+    if session.status is not SessionStatus.PAUSED:
+        raise SessionTransitionError(f"Cannot resume session from {session.status.value}")
+
+    require_iso_datetime(occurred_at, "occurred_at")
+    resumed = transition_session(session, status=SessionStatus.RECORDING, occurred_at=None)
+    _persist_status(connection, resumed)
+    return resumed
 
 
 def stop_session(

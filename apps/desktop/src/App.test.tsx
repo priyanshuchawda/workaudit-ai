@@ -4,8 +4,13 @@ import App from "./App";
 import {
   getSessionEvents,
   getSidecarHealth,
+  pauseRecordingSession,
+  resumeRecordingSession,
+  startRecordingSession,
   startSidecar,
+  stopRecordingSession,
   stopSidecar,
+  type RecorderControlResult,
   type SessionEventsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
@@ -13,7 +18,11 @@ import {
 vi.mock("./lib/tauri-client", () => ({
   getSessionEvents: vi.fn(),
   getSidecarHealth: vi.fn(),
+  pauseRecordingSession: vi.fn(),
+  resumeRecordingSession: vi.fn(),
+  startRecordingSession: vi.fn(),
   startSidecar: vi.fn(),
+  stopRecordingSession: vi.fn(),
   stopSidecar: vi.fn(),
 }));
 
@@ -40,13 +49,74 @@ const healthySidecar: SidecarHealth = {
 
 const getSidecarHealthMock = vi.mocked(getSidecarHealth);
 const getSessionEventsMock = vi.mocked(getSessionEvents);
+const startRecordingSessionMock = vi.mocked(startRecordingSession);
+const pauseRecordingSessionMock = vi.mocked(pauseRecordingSession);
+const resumeRecordingSessionMock = vi.mocked(resumeRecordingSession);
+const stopRecordingSessionMock = vi.mocked(stopRecordingSession);
 const startSidecarMock = vi.mocked(startSidecar);
 const stopSidecarMock = vi.mocked(stopSidecar);
+
+const recordingControl: RecorderControlResult = {
+  status: "available",
+  message: "Recording session started.",
+  session: {
+    id: "sess_desktop_001",
+    startedAt: "2026-05-06T09:14:00+05:30",
+    endedAt: null,
+    status: "recording",
+    title: "Desktop recording",
+    storagePath: null,
+    privacyMode: "standard",
+  },
+};
+
+const pausedControl: RecorderControlResult = {
+  ...recordingControl,
+  message: "Recording session paused.",
+  session: {
+    ...recordingControl.session!,
+    status: "paused",
+  },
+};
+
+const stoppedControl: RecorderControlResult = {
+  ...recordingControl,
+  message: "Recording session stopped.",
+  session: {
+    ...recordingControl.session!,
+    endedAt: "2026-05-06T09:17:00+05:30",
+    status: "stopped",
+  },
+};
 
 beforeEach(() => {
   getSessionEventsMock.mockReset();
   getSessionEventsMock.mockResolvedValue({ status: "unavailable", events: [] });
   getSidecarHealthMock.mockReset();
+  startRecordingSessionMock.mockReset();
+  startRecordingSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Recorder sidecar bridge is unavailable.",
+    session: null,
+  });
+  pauseRecordingSessionMock.mockReset();
+  pauseRecordingSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Recorder sidecar bridge is unavailable.",
+    session: null,
+  });
+  resumeRecordingSessionMock.mockReset();
+  resumeRecordingSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Recorder sidecar bridge is unavailable.",
+    session: null,
+  });
+  stopRecordingSessionMock.mockReset();
+  stopRecordingSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Recorder sidecar bridge is unavailable.",
+    session: null,
+  });
   startSidecarMock.mockReset();
   stopSidecarMock.mockReset();
 });
@@ -229,6 +299,81 @@ test("renders session dashboard surfaces with honest unavailable actions", async
   expect(screen.getByRole("button", { name: "Export raw JSON" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Delete session" })).toBeDisabled();
   expect(screen.getByText("Screenshot metadata bridge unavailable")).toBeInTheDocument();
+});
+
+test("starts pauses resumes and stops a recorder session from the desktop controls", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  startRecordingSessionMock.mockResolvedValue(recordingControl);
+  pauseRecordingSessionMock.mockResolvedValue(pausedControl);
+  resumeRecordingSessionMock.mockResolvedValue(recordingControl);
+  stopRecordingSessionMock.mockResolvedValue(stoppedControl);
+  getSessionEventsMock
+    .mockResolvedValueOnce({ status: "available", events: [] })
+    .mockResolvedValue({
+      status: "available",
+      events: [
+        {
+          id: "evt_live_001",
+          timestamp: "2026-05-06T09:14:00+05:30",
+          app: "VS Code",
+          windowTitle: "workaudit-ai - App.tsx",
+          source: "active_window",
+          type: "active_window_changed",
+        },
+      ],
+    });
+
+  render(<App />);
+
+  expect(await screen.findByText("Recorder idle")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Start recording" }));
+  expect(await screen.findByText("Recording")).toBeInTheDocument();
+  expect(screen.getByText("sess_desktop_001")).toBeInTheDocument();
+  expect(screen.getByText("standard")).toBeInTheDocument();
+  expect(screen.getByText("Recording session started.")).toBeInTheDocument();
+  expect(startRecordingSessionMock).toHaveBeenCalledOnce();
+
+  fireEvent.click(screen.getByRole("button", { name: "Pause recording" }));
+  expect(await screen.findByText("Paused")).toBeInTheDocument();
+  expect(screen.getByText("Recording session paused.")).toBeInTheDocument();
+  expect(pauseRecordingSessionMock).toHaveBeenCalledWith({
+    pausedAt: expect.any(String),
+    sessionId: "sess_desktop_001",
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Resume recording" }));
+  expect(await screen.findByText("Recording")).toBeInTheDocument();
+  expect(resumeRecordingSessionMock).toHaveBeenCalledWith({
+    resumedAt: expect.any(String),
+    sessionId: "sess_desktop_001",
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+  expect(await screen.findByText("Stopped")).toBeInTheDocument();
+  expect(screen.getByText("Recording session stopped.")).toBeInTheDocument();
+  expect(stopRecordingSessionMock).toHaveBeenCalledWith({
+    stoppedAt: expect.any(String),
+    sessionId: "sess_desktop_001",
+  });
+  const recorderControls = screen.getByRole("article", { name: "Recorder controls" });
+  expect(within(recorderControls).getByText("1")).toBeInTheDocument();
+});
+
+test("shows a safe recorder unavailable state when lifecycle bridge is missing", async () => {
+  getSidecarHealthMock.mockResolvedValue(missingSidecar);
+  startRecordingSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Recorder sidecar bridge is unavailable.",
+    session: null,
+  });
+
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Start recording" }));
+
+  expect(await screen.findByText("Recorder unavailable")).toBeInTheDocument();
+  expect(screen.getByText("Recorder sidecar bridge is unavailable.")).toBeInTheDocument();
 });
 
 test("filters live raw timeline events by source", async () => {

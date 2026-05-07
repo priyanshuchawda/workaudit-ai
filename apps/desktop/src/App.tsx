@@ -10,19 +10,19 @@ import {
 import {
   getSessionEvents,
   getSidecarHealth,
+  pauseRecordingSession,
+  resumeRecordingSession,
+  startRecordingSession,
   startSidecar,
+  stopRecordingSession,
   stopSidecar,
+  type RecorderControlResult,
+  type RecorderSession,
   type SessionEventsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
 const statusPanels = [
-  {
-    title: "Recorder",
-    state: "Control flow pending",
-    tone: "border-amber-300 bg-amber-50 text-amber-950",
-    details: "Start, pause, resume, and stop controls are not fully wired in this dashboard yet.",
-  },
   {
     title: "Privacy",
     state: "Local-first",
@@ -48,6 +48,14 @@ const initialSessionEvents: SessionEventsResult = {
   status: "unavailable",
   events: [],
 };
+
+const initialRecorderMessage = "Ready to start a local sidecar-backed recording session.";
+
+type RecorderUiStatus =
+  | "idle"
+  | "loading"
+  | "unavailable"
+  | RecorderSession["status"];
 
 type EventFilter = "all" | RawTimelineEvent["source"];
 
@@ -75,6 +83,9 @@ const sidecarTone: Record<SidecarHealth["status"], string> = {
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
+  const [recorderSession, setRecorderSession] = useState<RecorderSession | null>(null);
+  const [recorderStatus, setRecorderStatus] = useState<RecorderUiStatus>("idle");
+  const [recorderMessage, setRecorderMessage] = useState(initialRecorderMessage);
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const sourceEvents: RawTimelineEvent[] =
     sessionEvents.status === "available" ? sessionEvents.events : rawTimelineSimulationEvents;
@@ -107,6 +118,73 @@ function App() {
     setSidecarHealth(await stopSidecar());
   };
 
+  const applyRecorderResult = async (result: RecorderControlResult) => {
+    setRecorderMessage(result.message);
+    if (result.status === "unavailable") {
+      setRecorderStatus("unavailable");
+      return;
+    }
+
+    setRecorderSession(result.session);
+    setRecorderStatus(result.session.status);
+    setSessionEvents(await getSessionEvents(result.session.id));
+  };
+
+  const handleStartRecording = async () => {
+    setRecorderStatus("loading");
+    setRecorderMessage("Starting recording session.");
+    await applyRecorderResult(
+      await startRecordingSession({
+        sessionId: createSessionId(),
+        startedAt: nowWithOffset(),
+        title: "Desktop recording",
+        privacyMode: "standard",
+      }),
+    );
+  };
+
+  const handlePauseRecording = async () => {
+    if (!recorderSession) {
+      return;
+    }
+    setRecorderStatus("loading");
+    setRecorderMessage("Pausing recording session.");
+    await applyRecorderResult(
+      await pauseRecordingSession({
+        sessionId: recorderSession.id,
+        pausedAt: nowWithOffset(),
+      }),
+    );
+  };
+
+  const handleResumeRecording = async () => {
+    if (!recorderSession) {
+      return;
+    }
+    setRecorderStatus("loading");
+    setRecorderMessage("Resuming recording session.");
+    await applyRecorderResult(
+      await resumeRecordingSession({
+        sessionId: recorderSession.id,
+        resumedAt: nowWithOffset(),
+      }),
+    );
+  };
+
+  const handleStopRecording = async () => {
+    if (!recorderSession) {
+      return;
+    }
+    setRecorderStatus("loading");
+    setRecorderMessage("Stopping recording session.");
+    await applyRecorderResult(
+      await stopRecordingSession({
+        sessionId: recorderSession.id,
+        stoppedAt: nowWithOffset(),
+      }),
+    );
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -135,7 +213,7 @@ function App() {
             </h1>
           </div>
           <div className="rounded-md border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-700">
-            Phase: dashboard foundation
+            Phase: recorder control flow
           </div>
         </header>
 
@@ -189,6 +267,16 @@ function App() {
               </div>
             </div>
           </article>
+          <RecorderControlPanel
+            eventCount={sessionEvents.status === "available" ? sessionEvents.events.length : 0}
+            message={recorderMessage}
+            onPause={handlePauseRecording}
+            onResume={handleResumeRecording}
+            onStart={handleStartRecording}
+            onStop={handleStopRecording}
+            session={recorderSession}
+            status={recorderStatus}
+          />
           {statusPanels.map((panel) => (
             <article
               className={`min-h-44 rounded-md border p-5 shadow-sm ${panel.tone}`}
@@ -326,6 +414,90 @@ function App() {
   );
 }
 
+function RecorderControlPanel({
+  eventCount,
+  message,
+  onPause,
+  onResume,
+  onStart,
+  onStop,
+  session,
+  status,
+}: {
+  eventCount: number;
+  message: string;
+  onPause: () => void;
+  onResume: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  session: RecorderSession | null;
+  status: RecorderUiStatus;
+}) {
+  const isBusy = status === "loading";
+  const canPause = session?.status === "recording" && !isBusy;
+  const canResume = session?.status === "paused" && !isBusy;
+  const canStop =
+    (session?.status === "recording" || session?.status === "paused") && !isBusy;
+
+  return (
+    <article
+      aria-label="Recorder controls"
+      className={`min-h-44 rounded-md border p-5 shadow-sm ${recorderTone(status)}`}
+    >
+      <div className="flex h-full flex-col justify-between gap-5">
+        <div>
+          <h2 className="text-lg font-semibold tracking-normal">Recorder</h2>
+          <p className="mt-3 text-2xl font-semibold tracking-normal">
+            {recorderLabel(status)}
+          </p>
+        </div>
+        <div className="space-y-3">
+          <p className="text-sm leading-6">{message}</p>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <Metric label="Events" value={eventCount.toString()} />
+            <Metric label="Privacy" value={session?.privacyMode ?? "standard"} />
+            <Metric label="Session" value={session?.id ?? "none"} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isBusy || session?.status === "recording" || session?.status === "paused"}
+              onClick={onStart}
+              type="button"
+            >
+              Start recording
+            </button>
+            <button
+              className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canPause}
+              onClick={onPause}
+              type="button"
+            >
+              Pause recording
+            </button>
+            <button
+              className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canResume}
+              onClick={onResume}
+              type="button"
+            >
+              Resume recording
+            </button>
+            <button
+              className="rounded-md border border-current px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!canStop}
+              onClick={onStop}
+              type="button"
+            >
+              Stop recording
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
@@ -345,6 +517,41 @@ function UnavailableButton({ label }: { label: string }) {
       {label}
     </button>
   );
+}
+
+function recorderLabel(status: RecorderUiStatus): string {
+  const labels: Record<RecorderUiStatus, string> = {
+    idle: "Recorder idle",
+    loading: "Working",
+    unavailable: "Recorder unavailable",
+    recording: "Recording",
+    paused: "Paused",
+    stopped: "Stopped",
+    interrupted: "Interrupted",
+  };
+  return labels[status];
+}
+
+function recorderTone(status: RecorderUiStatus): string {
+  if (status === "recording") {
+    return "border-emerald-300 bg-emerald-50 text-emerald-950";
+  }
+  if (status === "paused" || status === "idle" || status === "loading") {
+    return "border-amber-300 bg-amber-50 text-amber-950";
+  }
+  if (status === "unavailable" || status === "interrupted") {
+    return "border-rose-300 bg-rose-50 text-rose-950";
+  }
+  return "border-zinc-300 bg-zinc-50 text-zinc-950";
+}
+
+function createSessionId(): string {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  return `sess_desktop_${randomId.replace(/-/g, "_")}`;
+}
+
+function nowWithOffset(): string {
+  return new Date().toISOString().replace("Z", "+00:00");
 }
 
 function filterLabel(filter: EventFilter): string {

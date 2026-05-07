@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 01:42 local / 2026-05-07 20:12 UTC
+2026-05-08 01:56 local / 2026-05-07 20:26 UTC
 
 ## Current Issue
-#99 — Optional audio transcription runtime
+#101 — AI report eval benchmark
 
 ## Current Branch
-feat/99-optional-audio-transcription-runtime
+feat/101-ai-report-eval-benchmark
 
 ## Current Phase
-Self-reviewing #99 after full quality gate
+Full #101 quality gate passed; self-reviewing diff before commit/PR
 
 ## Completed Since Last Update
 - Merged #95 via PR #96 and confirmed issue #95 is closed.
@@ -96,6 +96,18 @@ Self-reviewing #99 after full quality gate
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `cargo test --workspace` (31 passed)
+- Opened PR #100 for #99, confirmed the available GitGuardian check was green, merged PR #100 into `main`, and confirmed issue #99 is closed.
+- Created #101: AI report eval benchmark.
+- Started branch `feat/101-ai-report-eval-benchmark` from updated `main`.
+- Read existing golden eval runner, report-generation contract, eval docs/results, and portfolio claim-discipline tests.
+- Wrote the #101 implementation plan at `docs/superpowers/plans/2026-05-08-ai-report-eval-benchmark.md`.
+- Added red tests for AI report eval modes, reproducible table output, generated evidence citation validity, invalid evidence failure, privacy leak count, unavailable fallback, and no model call during recording.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py -q` failing on missing `worktrace_agent.evals.ai_report_benchmark`.
+- Implemented `worktrace_agent.evals.ai_report_benchmark` with deterministic report, fake Gemma E2B, fake Gemma E4B deep, and model-unavailable modes.
+- Updated `scripts/evaluate_model.py` to print the deterministic golden-session table plus the AI report eval aggregate table.
+- Updated README/eval docs to state that AI report evals are fake-runtime proxy checks and not real Gemma runtime proof.
+- Focused #101 checks passed: `uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py tests/test_golden_sessions_eval.py tests/test_portfolio_claim_discipline.py -q` (17 passed) and `uv run --python 3.13 python scripts/evaluate_model.py`.
+- Full #101 quality gate passed across Python, shared package, desktop, and Rust.
 - Merged #93 via PR #94 and confirmed issue #93 is closed.
 - Created #95: Gemma E4B deep mode.
 - Started branch `feat/95-gemma-e4b-deep-mode` from updated `main`.
@@ -236,17 +248,32 @@ Self-reviewing #99 after full quality gate
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
-- `docs/superpowers/plans/2026-05-08-optional-audio-transcription-runtime.md`
 - `README.md`
-- `docs/model-routing.md`
-- `docs/models/local_model_runtime.md`
-- `docs/models/audio.md`
-- `services/local-agent/src/worktrace_agent/capture/audio_transcription.py`
-- `services/local-agent/src/worktrace_agent/capture/faster_whisper_runtime.py`
-- `services/local-agent/tests/test_audio_embeddings.py`
-- `services/local-agent/tests/test_faster_whisper_runtime.py`
+- `docs/evals.md`
+- `docs/eval-results.md`
+- `docs/superpowers/plans/2026-05-08-ai-report-eval-benchmark.md`
+- `services/local-agent/scripts/evaluate_model.py`
+- `services/local-agent/src/worktrace_agent/evals/ai_report_benchmark.py`
+- `services/local-agent/tests/test_ai_report_eval_benchmark.py`
 
 ## Tests Run
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py -q` — failed as expected because `worktrace_agent.evals.ai_report_benchmark` was not implemented yet.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py -q` — passed, 5 tests.
+- `cd services/local-agent; uv run --python 3.13 python scripts/evaluate_model.py` — passed and printed deterministic golden-session plus AI report eval benchmark tables.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py tests/test_golden_sessions_eval.py tests/test_portfolio_claim_discipline.py -q` — passed, 17 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed after formatting changed Python files.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — failed once on style/import cleanup in the new benchmark files, then passed after fixing the root cause.
+- `cd services/local-agent; uv run --python 3.13 pyright` — failed once on missing/unknown typing in the new benchmark helpers, then passed after tightening annotations.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop test` — passed.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — passed, 15 tests.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py -q` — passed, 6 tests.
@@ -407,14 +434,13 @@ Self-reviewing #99 after full quality gate
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- Full #99 gate not run yet.
-- Real faster-whisper smoke not run; this slice uses fake recognizer tests and no model download/startup.
+- Packaging gates not run for #101 because this eval-only change does not affect sidecar or Windows packaging.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run `git diff --check`, self-review the #99 diff, then stage/commit/push/open PR if clean.
+Run `git diff --check`, self-review the #101 diff, then commit, push, open PR, wait for checks, and merge if green.
 
 ## Do Not Forget
 - No OCR before OCR issue.

@@ -6,7 +6,7 @@ WorkTrace builds an evidence-backed timeline from local desktop events and gener
 
 Planning + Phase 0 foundation. Not production-ready yet.
 
-This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with compressed PNG artifact storage and retention cleanup, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, hardened privacy redaction/private-mode suppression for implemented capture workers, selective OCR runtime guardrails with optional runtime availability checks, a desktop local AI report panel wired through typed sidecar endpoints, a metadata-only Gemma 4 E2B default report model manifest, manual local-file model install/uninstall helpers, a localhost-only Qwen3 embedding runtime adapter with fakeable transport tests, and an optional lazy faster-whisper transcription adapter with fake recognizer tests. It does not yet include terminal spying/global shell capture, continuous OCR, bundled PaddleOCR, always-on audio transcription, automatic model downloads, or a smoke-tested real local model runtime.
+This repository currently contains planning documents, the initial project structure, shared contracts, the first SQLite migration foundation, fake-session storage/export proof, a desktop session dashboard foundation, minimal FastAPI app, typed sidecar health commands, a Tauri session-event bridge for configured local sidecar events, desktop recorder lifecycle controls for a configured local sidecar, a configured localhost sidecar launch/stop abstraction, a first real Windows active-window polling loop, real Windows screenshot capture with compressed PNG artifact storage and retention cleanup, desktop screenshot metadata review/delete controls through the configured sidecar, metadata-only file watcher capture for configured folders, explicit safe terminal command ingestion in the Python sidecar, hardened privacy redaction/private-mode suppression for implemented capture workers, selective OCR runtime guardrails with optional runtime availability checks, a desktop local AI report panel wired through typed sidecar endpoints, a metadata-only Gemma 4 E2B default report model manifest, manual local-file model install/uninstall helpers, a localhost-only Qwen3 embedding runtime adapter with fakeable transport tests, an optional lazy faster-whisper transcription adapter with fake recognizer tests, and a deterministic AI report eval benchmark with fake Gemma proxy modes plus unavailable-runtime fallback coverage. It does not yet include terminal spying/global shell capture, continuous OCR, bundled PaddleOCR, always-on audio transcription, automatic model downloads, or a smoke-tested real local model runtime.
 
 MVP 0 now includes shared contract schemas for events, sessions, reports, evidence IDs, privacy levels, confidence, and model run metadata.
 
@@ -72,6 +72,8 @@ MVP 3 now includes a deterministic workflow debugger foundation that derives evi
 
 MVP 4 now includes 20 compact golden sessions and a deterministic eval runner that prints a reproducible benchmark table for timeline accuracy, blocker metrics, hallucinated evidence, privacy leaks, and estimated resource columns. This is not real Windows resource profiling yet.
 
+MVP 4 now includes an AI report eval benchmark that compares deterministic reports, fake Gemma E2B local report output, fake Gemma E4B deep-mode output, and model-unavailable fallback behavior across the golden sessions. It verifies evidence citation validity, generated-report evidence-ID coverage, privacy leak count, no model call during recording, unavailable fallback handling, summary usefulness proxy, blocker precision/recall proxy, and deterministic latency/memory estimates. It does not prove real Gemma quality or performance because no real local model runtime smoke has been run yet.
+
 MVP 4 now includes deterministic recording resource budget checks, screenshot retention cleanup tests, and a fake 30-minute recording budget simulation for CPU, RAM, DB growth, screenshot storage, and model-loaded policy. This is not yet real Windows capture profiling.
 
 MVP dashboard work now includes desktop-accessible deterministic Markdown and raw JSON export review through the configured local sidecar bridge. The desktop shows preview text, export paths, evidence IDs, safe unavailable/error states, session-folder lookup status, and a local AI report panel with generate/regenerate/cancel controls wired through the typed sidecar boundary. Without a configured local runtime, the panel reports a safe unavailable state and does not fake success.
@@ -87,7 +89,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 ## Evidence and Verification
 
 - Shared schema tests validate event, session, timeline, finding, report, privacy, confidence, evidence ID, and model metadata contracts.
-- Python tests validate storage, migrations, fake sessions, session state, privacy redaction, exports, timeline chunks, report guards, optional AI-worker contracts, workflow debugger rules, golden evals, and resource budgets.
+- Python tests validate storage, migrations, fake sessions, session state, privacy redaction, exports, timeline chunks, report guards, optional AI-worker contracts, workflow debugger rules, golden evals, AI report eval proxies, and resource budgets.
 - Desktop tests validate the status shell, sidecar health states, recovery banner preview, raw timeline preview, safe/live session-event bridge states, export review controls, local AI report UI states with a fake bridge response, screenshot metadata/delete states, and session browser list/delete behavior.
 - `docs/eval-results.md` records the reproducible golden-session eval command and current aggregate result.
 - `docs/sample-report.md` shows a deterministic evidence-cited sample report from local fixture-style data.
@@ -110,6 +112,7 @@ The project is still a foundation/demo repo. It now has real Windows active-wind
 - Local model runtimes and automatic model downloads are not integrated.
 - Installer output is not code-signed and not production-distributed yet.
 - Resource budget checks use deterministic fake samples plus storage cleanup tests, not a live Windows recording benchmark.
+- AI report eval rows for Gemma E2B/E4B are fake-runtime proxy checks, not real local model benchmarks.
 
 ## What It Is
 

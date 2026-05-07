@@ -13,3 +13,5 @@ Rules:
 - Failures must never corrupt session rows, raw events, screenshots, exports, or OCR results.
 
 For #81, a metadata-only cache manager may inspect local files, validate checksums, and decide whether a future explicit download could be offered. It must not perform network downloads or load model runtimes.
+
+For #89, WorkTrace adds a manual local-file install/uninstall helper. A user-managed file can be copied into the local cache only after disk-space checks, expected-size validation, optional checksum validation, and temp-file-to-atomic-rename promotion. Failed verification removes only the temp file and preserves any existing cached model file. Uninstall deletes only the exact cached model file. This is still not a network downloader and still does not start or load model runtimes.

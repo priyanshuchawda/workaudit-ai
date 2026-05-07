@@ -17,6 +17,8 @@ For #85, the desktop local AI report panel is wired through React, Tauri, and Fa
 
 For #87, the default report model config is Gemma 4 E2B-it Q4. WorkTrace maps it to `gemma4:e2b` for Ollama-style localhost runtimes and records `google/gemma-4-E2B-it` as the Hugging Face source ID. This is manifest/config metadata only: no model is downloaded, loaded, started, or smoke-tested by WorkTrace.
 
+For #89, WorkTrace can manually install a user-supplied local model file into the cache after disk-space, size, and checksum checks, and can uninstall the exact cached file. This does not perform network downloads, start model servers, import heavy runtime packages, or load models during recording.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

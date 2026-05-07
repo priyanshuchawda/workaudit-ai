@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 01:30 local / 2026-05-07 20:00 UTC
+2026-05-08 01:42 local / 2026-05-07 20:12 UTC
 
 ## Current Issue
-#97 — Qwen3-VL selected-frame vision
+#99 — Optional audio transcription runtime
 
 ## Current Branch
-feat/97-qwen3-vl-selected-frame-vision
+feat/99-optional-audio-transcription-runtime
 
 ## Current Phase
-Self-reviewing #97 after full quality gate
+Self-reviewing #99 after full quality gate
 
 ## Completed Since Last Update
 - Merged #95 via PR #96 and confirmed issue #95 is closed.
@@ -35,6 +35,58 @@ Self-reviewing #97 after full quality gate
   - `uv run --python 3.13 ruff check .`
   - `uv run --python 3.13 pyright` (0 errors)
   - `uv run --python 3.13 pytest` (242 passed)
+  - `pnpm --dir packages/shared typecheck`
+  - `pnpm --dir packages/shared test` (14 passed)
+  - `pnpm --dir apps/desktop typecheck`
+  - `pnpm --dir apps/desktop lint`
+  - `pnpm --dir apps/desktop test` (28 passed)
+  - `pnpm --dir apps/desktop build`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - `cargo test --workspace` (31 passed)
+- Opened PR #98 for #97, confirmed the available GitGuardian check was green, merged PR #98 into `main`, and confirmed issue #97 is closed.
+- Created #99: Optional audio transcription runtime.
+- Started branch `feat/99-optional-audio-transcription-runtime` from updated `main`.
+- Read `docs/faster_whisper.md`, existing audio transcription code/tests, and model runtime policy docs for #99.
+- Wrote the #99 implementation plan at `docs/superpowers/plans/2026-05-08-optional-audio-transcription-runtime.md`.
+- Added red tests for faster-whisper manifest/config metadata, fake recognizer parsing, safe failures, model availability/cache metadata, no heavy imports, and private-mode suppression.
+- Confirmed red state with `uv run --python 3.13 pytest tests/test_faster_whisper_runtime.py tests/test_audio_embeddings.py -q` failing on missing `worktrace_agent.capture.faster_whisper_runtime`.
+- Implemented `worktrace_agent.capture.faster_whisper_runtime` with lazy binding, fakeable recognizer protocol, CPU int8 base default metadata, manual-only Distil-Whisper metadata, temp-file cleanup, safe runtime errors, and availability/cache spec builders.
+- Updated audio transcription policy so private mode suppresses transcription before the engine is called.
+- Focused #99 audio tests passed with `uv run --python 3.13 pytest tests/test_faster_whisper_runtime.py tests/test_audio_embeddings.py -q` (15 passed).
+- Focused #99 model/audio checks passed:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest tests/test_faster_whisper_runtime.py tests/test_audio_embeddings.py tests/test_model_availability.py tests/test_model_cache.py tests/test_portfolio_claim_discipline.py -q` (46 passed)
+- Confirmed `faster_whisper` is not installed in the local uv environment with `importlib.util.find_spec`, so no real smoke can run without adding the optional dependency/model.
+- Full #99 quality gate passed:
+  - `uv run --python 3.13 ruff format .` (95 files left unchanged)
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright` (0 errors)
+  - `uv run --python 3.13 pytest` (251 passed)
+  - `pnpm --dir packages/shared typecheck`
+  - `pnpm --dir packages/shared test` (14 passed)
+  - `pnpm --dir apps/desktop typecheck`
+  - `pnpm --dir apps/desktop lint`
+  - `pnpm --dir apps/desktop test` (28 passed)
+  - `pnpm --dir apps/desktop build`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - `cargo test --workspace` (31 passed)
+- Self-review found that the real faster-whisper binding could pass a model-size string to `WhisperModel`, which docs say can auto-download from Hugging Face.
+- Added a red regression test proving the real binding must refuse missing local model paths before importing `faster_whisper`.
+- Updated the runtime config/binding so real faster-whisper calls require an explicit existing local model path before import.
+- Refreshed focused #99 checks after the auto-download guard:
+  - `uv run --python 3.13 ruff format .`
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright`
+  - `uv run --python 3.13 pytest tests/test_faster_whisper_runtime.py tests/test_audio_embeddings.py tests/test_model_availability.py tests/test_model_cache.py tests/test_portfolio_claim_discipline.py -q` (47 passed)
+- Refreshed the full #99 quality gate after the auto-download guard:
+  - `uv run --python 3.13 ruff format .` (95 files left unchanged)
+  - `uv run --python 3.13 ruff check .`
+  - `uv run --python 3.13 pyright` (0 errors)
+  - `uv run --python 3.13 pytest` (252 passed)
   - `pnpm --dir packages/shared typecheck`
   - `pnpm --dir packages/shared test` (14 passed)
   - `pnpm --dir apps/desktop typecheck`
@@ -184,14 +236,15 @@ Self-reviewing #97 after full quality gate
 
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
+- `docs/superpowers/plans/2026-05-08-optional-audio-transcription-runtime.md`
 - `README.md`
 - `docs/model-routing.md`
 - `docs/models/local_model_runtime.md`
-- `docs/models/qwen.md`
-- `docs/superpowers/plans/2026-05-08-qwen3-vl-selected-frame-vision.md`
-- `services/local-agent/src/worktrace_agent/ai/qwen_vl_runtime.py`
-- `services/local-agent/tests/test_qwen_vl_runtime.py`
-- `services/local-agent/tests/test_selected_frame_vision_analysis.py`
+- `docs/models/audio.md`
+- `services/local-agent/src/worktrace_agent/capture/audio_transcription.py`
+- `services/local-agent/src/worktrace_agent/capture/faster_whisper_runtime.py`
+- `services/local-agent/tests/test_audio_embeddings.py`
+- `services/local-agent/tests/test_faster_whisper_runtime.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -354,13 +407,14 @@ Self-reviewing #97 after full quality gate
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- Real Qwen3-VL runtime smoke not run yet; this issue is an adapter/fake-transport slice with no model download/startup.
+- Full #99 gate not run yet.
+- Real faster-whisper smoke not run; this slice uses fake recognizer tests and no model download/startup.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run `git diff --check`, self-review the #97 diff, then stage/commit/push/open PR if clean.
+Run `git diff --check`, self-review the #99 diff, then stage/commit/push/open PR if clean.
 
 ## Do Not Forget
 - No OCR before OCR issue.

@@ -27,6 +27,8 @@ For #95, WorkTrace adds manual-only Gemma 4 E4B-it Q4 deep-mode metadata and sel
 
 For #97, WorkTrace adds a localhost-only Qwen3-VL selected-frame adapter for user-managed local VLM services. Qwen3-VL-2B is the laptop-safe metadata default, Qwen3-VL-4B is manual-only until benchmarked, and VLM analysis remains selected-frame only with no model download, bundled weights, or continuous loop.
 
+For #99, WorkTrace adds an optional faster-whisper transcription adapter behind explicit audio opt-in. The adapter uses lazy runtime binding, keeps audio off by default, suppresses transcription in private mode, defaults metadata to CPU int8 `base`, and leaves Distil-Whisper manual-only until benchmarked. No model is downloaded, bundled, loaded during recording, or smoke-tested by default.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

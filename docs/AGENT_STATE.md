@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-07 22:35 local / 2026-05-07 17:05 UTC
+2026-05-07 22:50 local / 2026-05-07 17:20 UTC
 
 ## Current Issue
-#85 — AI report UI + generate button
+#87 — Gemma E2B local default config
 
 ## Current Branch
-feat/85-ai-report-ui
+feat/87-gemma-e2b-default-config
 
 ## Current Phase
-PR preparation
+Diff review before PR
 
 ## Completed Since Last Update
 - #69 export/review UX merged via PR #70.
@@ -65,25 +65,29 @@ PR preparation
 - Updated README/model docs/claim-discipline expectations to state that the UI is wired but defaults to unavailable without a configured local runtime.
 - Added safe failed-state handling when an injected/report service raises, so generation returns a redacted `failed_safely` result instead of leaking prompt/runtime errors.
 - Reran the full #85 quality gate successfully.
+- Staged, committed, pushed, opened PR #86 for #85, confirmed the available GitGuardian check was green, merged PR #86 into `main`, and confirmed issue #85 is closed.
+- Created #87: Gemma E2B local default config.
+- Started branch `feat/87-gemma-e2b-default-config` from updated `main`.
+- Read the required project docs and Gemma/model policy docs for #87.
+- Wrote the #87 implementation plan at `docs/superpowers/plans/2026-05-07-gemma-e2b-default-config.md`.
+- Added red tests for the Gemma 4 E2B-it Q4 default manifest, Ollama/Hugging Face model IDs, conservative budgets, 128K rejection, missing-model unavailable behavior, and no heavy imports.
+- Implemented `worktrace_agent.ai.gemma_manifest` with a metadata-only default Gemma report model manifest plus runtime/availability config builders.
+- Updated README, model-routing, and model runtime docs for the exact Gemma default config and no-download/no-runtime limitations.
+- Fixed the new Python module import ordering with Ruff.
+- Ran the full #87 quality gate successfully.
+- Self-review found that explicit `context_budget_tokens=0` would fall back to the default in the Gemma config builder.
+- Added a red regression test for zero context budget and fixed the builder to validate it explicitly.
+- Reran the focused #87 tests and full quality gate successfully after the zero-budget fix.
 
 ## Current Local Changes
-- `docs/AGENT_STATE.md`
-- `docs/superpowers/plans/2026-05-07-ai-report-ui.md`
 - `README.md`
-- `apps/desktop/src/App.test.tsx`
-- `apps/desktop/src/App.tsx`
-- `apps/desktop/src/lib/tauri-client.ts`
-- `apps/desktop/src-tauri/src/commands/sidecar.rs`
-- `apps/desktop/src-tauri/src/lib.rs`
-- `apps/desktop/src-tauri/src/services/sidecar.rs`
-- `apps/desktop/src-tauri/tests/sidecar_service.rs`
+- `docs/AGENT_STATE.md`
 - `docs/model-routing.md`
+- `docs/models/gemma.md`
 - `docs/models/local_model_runtime.md`
-- `services/local-agent/src/worktrace_agent/api/ai_report_service.py`
-- `services/local-agent/src/worktrace_agent/api/app.py`
-- `services/local-agent/src/worktrace_agent/api/routes/sessions.py`
-- `services/local-agent/tests/api/test_ai_report_routes.py`
-- `services/local-agent/tests/test_portfolio_claim_discipline.py`
+- `docs/superpowers/plans/2026-05-07-gemma-e2b-default-config.md`
+- `services/local-agent/src/worktrace_agent/ai/gemma_manifest.py`
+- `services/local-agent/tests/test_gemma_model_manifest.py`
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
@@ -181,17 +185,48 @@ PR preparation
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
 - `git diff --check` — passed.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_model_manifest.py -q` — failed as expected because `worktrace_agent.ai.gemma_manifest` was not implemented yet.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_model_manifest.py -q` — passed, 6 tests.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_model_manifest.py tests/test_local_report_runtime.py tests/test_model_cache.py tests/test_portfolio_claim_discipline.py -q` — passed, 34 tests.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed, 89 files left unchanged.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — failed once on unsorted imports in `gemma_manifest.py`, then passed after `ruff check . --fix`.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 198 tests.
+- `pnpm --dir packages/shared typecheck` — passed.
+- `pnpm --dir packages/shared test` — passed, 14 tests.
+- `pnpm --dir apps/desktop typecheck` — passed.
+- `pnpm --dir apps/desktop lint` — passed.
+- `pnpm --dir apps/desktop test` — passed, 28 tests.
+- `pnpm --dir apps/desktop build` — passed.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_model_manifest.py -q` — failed as expected for explicit zero context budget, then passed after adding the builder validation.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_model_manifest.py tests/test_local_report_runtime.py tests/test_model_cache.py tests/test_portfolio_claim_discipline.py -q` — passed, 35 tests after the zero-budget fix.
+- `cd services/local-agent; uv run --python 3.13 ruff format .` — passed, 89 files left unchanged after the zero-budget fix.
+- `cd services/local-agent; uv run --python 3.13 ruff check .` — passed after the zero-budget fix.
+- `cd services/local-agent; uv run --python 3.13 pyright` — passed, 0 errors after the zero-budget fix.
+- `cd services/local-agent; uv run --python 3.13 pytest` — passed, 199 tests after the zero-budget fix.
+- `pnpm --dir packages/shared typecheck` — passed after the zero-budget fix.
+- `pnpm --dir packages/shared test` — passed, 14 tests after the zero-budget fix.
+- `pnpm --dir apps/desktop typecheck` — passed after the zero-budget fix.
+- `pnpm --dir apps/desktop lint` — passed after the zero-budget fix.
+- `pnpm --dir apps/desktop test` — passed, 28 tests after the zero-budget fix.
+- `pnpm --dir apps/desktop build` — passed after the zero-budget fix.
+- `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed after the zero-budget fix.
+- `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed after the zero-budget fix.
+- `cd apps/desktop/src-tauri; cargo test --workspace` — passed, 31 Rust integration tests after the zero-budget fix.
 
 ## Tests Not Run
-- `pnpm --dir apps/desktop package:sidecar` — not run; #85 does not change sidecar packaging.
-- `pnpm --dir apps/desktop package:windows` — not run; #85 does not change installer packaging.
-- Real Ollama/Gemma/Qwen smoke — not run; #85 uses fake/report-boundary tests and no model download/runtime startup.
+- `pnpm --dir apps/desktop package:sidecar` — not run; #87 does not change sidecar packaging.
+- `pnpm --dir apps/desktop package:windows` — not run; #87 does not change installer packaging.
+- Real Ollama/Gemma/Qwen smoke — not run; #87 is a metadata-only default config and does not download/start a runtime.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Stage scoped #85 files only, commit, push `feat/85-ai-report-ui`, open PR, and watch checks.
+Run final diff/whitespace checks, stage scoped #87 files, commit, push, and open PR.
 
 ## Do Not Forget
 - No OCR before OCR issue.

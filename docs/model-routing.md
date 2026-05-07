@@ -33,3 +33,15 @@ Local report runtime policy:
 - default report context budget is capped at 8192 tokens, with deep mode capped at 16384 tokens until benchmarks justify more
 - prompts are capped before transport and oversized prompts fail safely
 - model downloads, model server startup, embeddings, audio, and vision are out of scope for the first report runtime adapter
+
+Default report model config:
+
+- Default local report model: Gemma 4 E2B-it Q4.
+- Ollama-style model tag: `gemma4:e2b`.
+- Hugging Face model ID: `google/gemma-4-E2B-it`.
+- Default context budget: 8192 tokens.
+- First maximum tested budget target: 16384 tokens.
+- Default max output tokens: 512.
+- Default temperature: 0.2.
+- Automatic downloads are disabled; this is manifest/config metadata only.
+- Gemma 4 E2B documents a 128K context window, but WorkTrace must not use that full window by default on the target 16 GB Windows laptop.

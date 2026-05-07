@@ -2,12 +2,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import {
+  deleteSession,
   deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
   getSessionEvents,
   getSessionFolder,
   getSessionScreenshots,
+  getSessions,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -17,20 +19,24 @@ import {
   stopSidecar,
   type RecorderControlResult,
   type ScreenshotDeletionResult,
+  type SessionDeletionResult,
   type SessionExportResult,
   type SessionEventsResult,
   type SessionFolderResult,
+  type SessionListResult,
   type SessionScreenshotsResult,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
 vi.mock("./lib/tauri-client", () => ({
+  deleteSession: vi.fn(),
   deleteSessionScreenshots: vi.fn(),
   exportSessionMarkdown: vi.fn(),
   exportSessionRawJson: vi.fn(),
   getSessionEvents: vi.fn(),
   getSessionFolder: vi.fn(),
   getSessionScreenshots: vi.fn(),
+  getSessions: vi.fn(),
   getSidecarHealth: vi.fn(),
   pauseRecordingSession: vi.fn(),
   resumeRecordingSession: vi.fn(),
@@ -65,6 +71,8 @@ const getSidecarHealthMock = vi.mocked(getSidecarHealth);
 const getSessionEventsMock = vi.mocked(getSessionEvents);
 const getSessionScreenshotsMock = vi.mocked(getSessionScreenshots);
 const deleteSessionScreenshotsMock = vi.mocked(deleteSessionScreenshots);
+const getSessionsMock = vi.mocked(getSessions);
+const deleteSessionMock = vi.mocked(deleteSession);
 const exportSessionMarkdownMock = vi.mocked(exportSessionMarkdown);
 const exportSessionRawJsonMock = vi.mocked(exportSessionRawJson);
 const getSessionFolderMock = vi.mocked(getSessionFolder);
@@ -182,6 +190,22 @@ beforeEach(() => {
     deletedFiles: 0,
     missingFiles: 0,
     deletedRows: 0,
+  });
+  getSessionsMock.mockReset();
+  getSessionsMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session list bridge is unavailable.",
+    sessions: [],
+  });
+  deleteSessionMock.mockReset();
+  deleteSessionMock.mockResolvedValue({
+    status: "unavailable",
+    message: "Session delete bridge is unavailable.",
+    deletedSessionRows: 0,
+    deletedScreenshotFiles: 0,
+    missingScreenshotFiles: 0,
+    deletedScreenshotRows: 0,
+    removedArtifactRoot: false,
   });
   exportSessionMarkdownMock.mockReset();
   exportSessionMarkdownMock.mockResolvedValue({
@@ -735,4 +759,86 @@ test("shows interrupted session recovery actions", async () => {
   expect(within(recovery).getByRole("button", { name: "Review" })).toBeInTheDocument();
   expect(within(recovery).getByRole("button", { name: "Export" })).toBeInTheDocument();
   expect(within(recovery).getByRole("button", { name: "Delete" })).toBeInTheDocument();
+});
+
+const sessionListResult: SessionListResult = {
+  status: "available",
+  message: "Sessions loaded.",
+  sessions: [
+    {
+      id: "sess_browser_001",
+      startedAt: "2026-05-06T09:14:00+05:30",
+      endedAt: "2026-05-06T09:15:00+05:30",
+      status: "stopped",
+      title: "Test session",
+      storagePath: null,
+      privacyMode: "standard",
+      eventCount: 2,
+      screenshotCount: 1,
+    },
+    {
+      id: "sess_browser_002",
+      startedAt: "2026-05-05T10:00:00+05:30",
+      endedAt: null,
+      status: "interrupted",
+      title: null,
+      storagePath: null,
+      privacyMode: "standard",
+      eventCount: 0,
+      screenshotCount: 0,
+    },
+  ],
+};
+
+const sessionDeletion: SessionDeletionResult = {
+  status: "available",
+  message: "Session deleted.",
+  deletedSessionRows: 1,
+  deletedScreenshotFiles: 1,
+  missingScreenshotFiles: 0,
+  deletedScreenshotRows: 1,
+  removedArtifactRoot: true,
+};
+
+test("session browser panel shows unavailable state when sidecar is missing", async () => {
+  getSidecarHealthMock.mockResolvedValue(missingSidecar);
+
+  render(<App />);
+
+  const panel = await screen.findByRole("region", { name: "Session browser" });
+
+  expect(within(panel).getByRole("button", { name: "Refresh sessions" })).toBeInTheDocument();
+  expect(within(panel).getByText("Session list bridge is unavailable.")).toBeInTheDocument();
+});
+
+test("session browser loads session list from sidecar and shows session details", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionsMock.mockResolvedValue(sessionListResult);
+
+  render(<App />);
+
+  const panel = await screen.findByRole("region", { name: "Session browser" });
+
+  expect(await within(panel).findByText("sess_browser_001")).toBeInTheDocument();
+  expect(within(panel).getByText("Test session")).toBeInTheDocument();
+  expect(within(panel).getByText("2 events")).toBeInTheDocument();
+  expect(within(panel).getByText("1 screenshot")).toBeInTheDocument();
+  expect(within(panel).getByText("sess_browser_002")).toBeInTheDocument();
+});
+
+test("session browser deletes a selected session through the bridge", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionsMock.mockResolvedValue(sessionListResult);
+  deleteSessionMock.mockResolvedValue(sessionDeletion);
+
+  render(<App />);
+
+  const panel = await screen.findByRole("region", { name: "Session browser" });
+  expect(await within(panel).findByText("sess_browser_001")).toBeInTheDocument();
+
+  fireEvent.click(within(panel).getByRole("button", { name: "Delete session sess_browser_001" }));
+
+  expect(deleteSessionMock).toHaveBeenCalledWith("sess_browser_001");
+  expect(await within(panel).findByText("Session deleted.")).toBeInTheDocument();
+  expect(within(panel).getByText("1 session row deleted")).toBeInTheDocument();
 });

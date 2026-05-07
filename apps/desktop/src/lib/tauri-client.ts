@@ -110,6 +110,42 @@ export type ScreenshotDeletionResult =
       deletedRows: 0;
     };
 
+export type SessionSummary = {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: string;
+  title: string | null;
+  storagePath: string | null;
+  privacyMode: string;
+  eventCount: number;
+  screenshotCount: number;
+};
+
+export type SessionListResult =
+  | { status: "available"; message: string; sessions: SessionSummary[] }
+  | { status: "unavailable"; message: string; sessions: [] };
+
+export type SessionDeletionResult =
+  | {
+      status: "available";
+      message: string;
+      deletedSessionRows: number;
+      deletedScreenshotFiles: number;
+      missingScreenshotFiles: number;
+      deletedScreenshotRows: number;
+      removedArtifactRoot: boolean;
+    }
+  | {
+      status: "unavailable";
+      message: string;
+      deletedSessionRows: 0;
+      deletedScreenshotFiles: 0;
+      missingScreenshotFiles: 0;
+      deletedScreenshotRows: 0;
+      removedArtifactRoot: false;
+    };
+
 const SIDE_CAR_COMMANDS = {
   health: "get_sidecar_health",
   start: "start_sidecar",
@@ -124,6 +160,8 @@ const SIDE_CAR_COMMANDS = {
   sessionFolder: "get_session_folder",
   sessionScreenshots: "get_session_screenshots",
   deleteSessionScreenshots: "delete_session_screenshots",
+  sessions: "get_sessions",
+  deleteSession: "delete_session",
 } as const;
 
 const UNHEALTHY_FALLBACK: SidecarHealth = {
@@ -163,6 +201,22 @@ const SCREENSHOT_DELETION_FALLBACK: ScreenshotDeletionResult = {
   deletedFiles: 0,
   missingFiles: 0,
   deletedRows: 0,
+};
+
+const SESSION_LIST_FALLBACK: SessionListResult = {
+  status: "unavailable",
+  message: "Session list bridge is unavailable.",
+  sessions: [],
+};
+
+const SESSION_DELETION_FALLBACK: SessionDeletionResult = {
+  status: "unavailable",
+  message: "Session delete bridge is unavailable.",
+  deletedSessionRows: 0,
+  deletedScreenshotFiles: 0,
+  missingScreenshotFiles: 0,
+  deletedScreenshotRows: 0,
+  removedArtifactRoot: false,
 };
 
 export async function getSidecarHealth(): Promise<SidecarHealth> {
@@ -274,6 +328,22 @@ export async function deleteSessionScreenshots(
     });
   } catch {
     return SCREENSHOT_DELETION_FALLBACK;
+  }
+}
+
+export async function getSessions(): Promise<SessionListResult> {
+  try {
+    return await invoke<SessionListResult>(SIDE_CAR_COMMANDS.sessions);
+  } catch {
+    return SESSION_LIST_FALLBACK;
+  }
+}
+
+export async function deleteSession(sessionId: string): Promise<SessionDeletionResult> {
+  try {
+    return await invoke<SessionDeletionResult>(SIDE_CAR_COMMANDS.deleteSession, { sessionId });
+  } catch {
+    return SESSION_DELETION_FALLBACK;
   }
 }
 

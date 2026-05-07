@@ -7,8 +7,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from worktrace_agent.api.session_recorder_service import (
+    SessionDeletionResult,
     SessionExportPreview,
     SessionRecorderService,
+    SessionSummary,
     is_sqlite_missing_session_error,
     map_session_error,
 )
@@ -74,6 +76,22 @@ class SessionEventsResponse(BaseModel):
     events: list[RawEventResponse]
 
 
+class SessionSummaryResponse(BaseModel):
+    id: str
+    started_at: str
+    ended_at: str | None
+    status: str
+    title: str | None
+    storage_path: str | None
+    privacy_mode: str
+    event_count: int
+    screenshot_count: int
+
+
+class SessionsResponse(BaseModel):
+    sessions: list[SessionSummaryResponse]
+
+
 class ScreenshotResponse(BaseModel):
     id: str
     session_id: str
@@ -108,6 +126,22 @@ class SessionExportResponse(BaseModel):
 
 class SessionFolderResponse(BaseModel):
     path: str
+
+
+class DeleteSessionResponse(BaseModel):
+    deleted_session_rows: int
+    deleted_screenshot_files: int
+    missing_screenshot_files: int
+    deleted_screenshot_rows: int
+    removed_artifact_root: bool
+
+
+@router.get("", response_model=SessionsResponse)
+async def list_recording_sessions(request: Request) -> SessionsResponse:
+    service = _session_service(request)
+    return SessionsResponse(
+        sessions=[_session_summary_response(session) for session in service.list_sessions()]
+    )
 
 
 @router.post("/start", response_model=SessionResponse)
@@ -286,6 +320,19 @@ async def get_recording_session_folder(
     return SessionFolderResponse(path=folder.path.as_posix())
 
 
+@router.delete("/{session_id}", response_model=DeleteSessionResponse)
+async def delete_recording_session(
+    session_id: str,
+    request: Request,
+) -> DeleteSessionResponse:
+    service = _session_service(request)
+    try:
+        result = await service.delete_session(session_id=session_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return _delete_session_response(result)
+
+
 def _session_service(request: Request) -> SessionRecorderService:
     return cast(SessionRecorderService, request.app.state.session_recorder_service)
 
@@ -315,6 +362,20 @@ def _raw_event_response(event: RawEvent) -> RawEventResponse:
     )
 
 
+def _session_summary_response(session: SessionSummary) -> SessionSummaryResponse:
+    return SessionSummaryResponse(
+        id=session.id,
+        started_at=session.started_at,
+        ended_at=session.ended_at,
+        status=session.status,
+        title=session.title,
+        storage_path=session.storage_path,
+        privacy_mode=session.privacy_mode,
+        event_count=session.event_count,
+        screenshot_count=session.screenshot_count,
+    )
+
+
 def _screenshot_response(screenshot: ScreenshotArtifact) -> ScreenshotResponse:
     return ScreenshotResponse(
         id=screenshot.id,
@@ -338,4 +399,14 @@ def _session_export_response(export: SessionExportPreview) -> SessionExportRespo
         path=export.path.as_posix(),
         preview=export.preview,
         evidence_ids=export.evidence_ids,
+    )
+
+
+def _delete_session_response(result: SessionDeletionResult) -> DeleteSessionResponse:
+    return DeleteSessionResponse(
+        deleted_session_rows=result.deleted_session_rows,
+        deleted_screenshot_files=result.deleted_screenshot_files,
+        missing_screenshot_files=result.missing_screenshot_files,
+        deleted_screenshot_rows=result.deleted_screenshot_rows,
+        removed_artifact_root=result.removed_artifact_root,
     )

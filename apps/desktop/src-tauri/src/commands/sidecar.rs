@@ -1,6 +1,7 @@
 use crate::services::sidecar::{
-    RecorderControlResult, ScreenshotDeletionResult, SessionEventsResult, SessionExportResult,
-    SessionFolderResult, SessionScreenshotsResult, SidecarHealth, SidecarService,
+    RecorderControlResult, ScreenshotDeletionResult, SessionDeletionResult, SessionEventsResult,
+    SessionExportResult, SessionFolderResult, SessionListResult, SessionScreenshotsResult,
+    SidecarHealth, SidecarService,
 };
 
 #[tauri::command]
@@ -71,4 +72,14 @@ pub fn get_session_screenshots(session_id: String) -> SessionScreenshotsResult {
 #[tauri::command]
 pub fn delete_session_screenshots(session_id: String) -> ScreenshotDeletionResult {
     SidecarService.delete_session_screenshots(session_id)
+}
+
+#[tauri::command]
+pub fn get_sessions() -> SessionListResult {
+    SidecarService.sessions()
+}
+
+#[tauri::command]
+pub fn delete_session(session_id: String) -> SessionDeletionResult {
+    SidecarService.delete_session(session_id)
 }

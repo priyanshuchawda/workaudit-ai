@@ -158,6 +158,31 @@ def list_sessions_by_status(
     return [_session_from_row(row) for row in rows]
 
 
+def list_sessions(connection: sqlite3.Connection) -> list[SessionRecord]:
+    rows = connection.execute(
+        """
+        SELECT id, started_at, ended_at, status, title, storage_path, privacy_mode
+        FROM sessions
+        ORDER BY started_at DESC, created_at DESC, id DESC
+        """
+    ).fetchall()
+
+    return [_session_from_row(row) for row in rows]
+
+
+def load_session_record(
+    connection: sqlite3.Connection,
+    session_id: str,
+) -> SessionRecord | None:
+    return _load_session(connection, session_id)
+
+
+def delete_session_record(connection: sqlite3.Connection, *, session_id: str) -> int:
+    with connection:
+        cursor = connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+    return cursor.rowcount
+
+
 def _persist_status(connection: sqlite3.Connection, session: SessionRecord) -> None:
     with connection:
         connection.execute(

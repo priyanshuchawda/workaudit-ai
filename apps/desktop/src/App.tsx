@@ -8,12 +8,14 @@ import {
   type RawTimelineEvent,
 } from "./features/timeline/raw-timeline-simulation";
 import {
+  deleteSession,
   deleteSessionScreenshots,
   exportSessionMarkdown,
   exportSessionRawJson,
   getSessionEvents,
   getSessionFolder,
   getSessionScreenshots,
+  getSessions,
   getSidecarHealth,
   pauseRecordingSession,
   resumeRecordingSession,
@@ -24,12 +26,14 @@ import {
   type RecorderControlResult,
   type RecorderSession,
   type ScreenshotDeletionResult,
+  type SessionDeletionResult,
   type SessionExportPreview,
   type SessionExportResult,
   type SessionEventsResult,
   type SessionFolderResult,
   type SessionScreenshot,
   type SessionScreenshotsResult,
+  type SessionSummary,
   type SidecarHealth,
 } from "./lib/tauri-client";
 
@@ -86,6 +90,14 @@ type ScreenshotDeletionState =
   | { status: "idle" | "loading" | "unavailable"; message: string; result: null }
   | { status: "success"; message: string; result: ScreenshotDeletionResult };
 
+type SessionBrowserState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; sessions: [] }
+  | { status: "success"; message: string; sessions: SessionSummary[] };
+
+type SessionDeletionState =
+  | { status: "idle" | "loading" | "unavailable"; message: string; result: null }
+  | { status: "success"; message: string; result: SessionDeletionResult };
+
 const eventFilters: { label: string; value: EventFilter }[] = [
   { label: "All", value: "all" },
   { label: "Active windows", value: "active_window" },
@@ -131,6 +143,18 @@ const initialScreenshotDeletionState: ScreenshotDeletionState = {
   result: null,
 };
 
+const initialSessionBrowserState: SessionBrowserState = {
+  status: "unavailable",
+  message: "Session list bridge is unavailable.",
+  sessions: [],
+};
+
+const initialSessionDeletionState: SessionDeletionState = {
+  status: "idle",
+  message: "No session deletion has run yet.",
+  result: null,
+};
+
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
@@ -147,6 +171,10 @@ function App() {
   const [screenshotDeletion, setScreenshotDeletion] =
     useState<ScreenshotDeletionState>(initialScreenshotDeletionState);
   const [selectedScreenshotId, setSelectedScreenshotId] = useState<string | null>(null);
+  const [sessionBrowser, setSessionBrowser] =
+    useState<SessionBrowserState>(initialSessionBrowserState);
+  const [sessionDeletion, setSessionDeletion] =
+    useState<SessionDeletionState>(initialSessionDeletionState);
   const sourceEvents: RawTimelineEvent[] =
     sessionEvents.status === "available" ? sessionEvents.events : rawTimelineSimulationEvents;
   const timelineEvents =
@@ -367,15 +395,76 @@ function App() {
     setSelectedScreenshotId(null);
   };
 
+  const handleRefreshSessions = useCallback(async () => {
+    setSessionBrowser({
+      status: "loading",
+      message: "Loading session list.",
+      sessions: [],
+    });
+    const result = await getSessions();
+    if (result.status === "unavailable") {
+      setSessionBrowser({
+        status: "unavailable",
+        message: result.message,
+        sessions: [],
+      });
+      return;
+    }
+    setSessionBrowser({
+      status: "success",
+      message: result.message,
+      sessions: result.sessions,
+    });
+  }, []);
+
+  const handleDeleteSession = async (sessionId: string) => {
+    setSessionDeletion({
+      status: "loading",
+      message: "Deleting session.",
+      result: null,
+    });
+    const result = await deleteSession(sessionId);
+    if (result.status === "unavailable") {
+      setSessionDeletion({
+        status: "unavailable",
+        message: result.message,
+        result: null,
+      });
+      return;
+    }
+    setSessionDeletion({
+      status: "success",
+      message: result.message,
+      result,
+    });
+    // Refresh the session list after deletion
+    void handleRefreshSessions();
+  };
+
   useEffect(() => {
     let isMounted = true;
 
-    void Promise.all([getSidecarHealth(), getSessionEvents()]).then(([health, events]) => {
-      if (isMounted) {
-        setSidecarHealth(health);
-        setSessionEvents(events);
-      }
-    });
+    void Promise.all([getSidecarHealth(), getSessionEvents(), getSessions()]).then(
+      ([health, events, sessions]) => {
+        if (isMounted) {
+          setSidecarHealth(health);
+          setSessionEvents(events);
+          if (sessions.status === "unavailable") {
+            setSessionBrowser({
+              status: "unavailable",
+              message: sessions.message,
+              sessions: [],
+            });
+          } else {
+            setSessionBrowser({
+              status: "success",
+              message: sessions.message,
+              sessions: sessions.sessions,
+            });
+          }
+        }
+      },
+    );
 
     return () => {
       isMounted = false;
@@ -508,6 +597,13 @@ function App() {
         </section>
 
         <RecoveryBanner sessions={recoverySimulationSessions} />
+
+        <SessionBrowserPanel
+          deletionState={sessionDeletion}
+          onDelete={handleDeleteSession}
+          onRefresh={handleRefreshSessions}
+          state={sessionBrowser}
+        />
 
         <section
           aria-label="Sessions"
@@ -1001,6 +1097,117 @@ function nowWithOffset(): string {
 
 function filterLabel(filter: EventFilter): string {
   return eventFilters.find((entry) => entry.value === filter)?.label ?? "All";
+}
+
+function SessionBrowserPanel({
+  deletionState,
+  onDelete,
+  onRefresh,
+  state,
+}: {
+  deletionState: SessionDeletionState;
+  onDelete: (sessionId: string) => void;
+  onRefresh: () => void;
+  state: SessionBrowserState;
+}) {
+  return (
+    <section
+      aria-label="Session browser"
+      className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+            Session browser
+          </p>
+          <h2 className="mt-2 text-xl font-semibold tracking-normal">Past sessions</h2>
+        </div>
+        <button
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={state.status === "loading"}
+          onClick={onRefresh}
+          type="button"
+        >
+          Refresh sessions
+        </button>
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-zinc-700">{state.message}</p>
+
+      {state.status === "loading" ? (
+        <p className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+          Loading session list.
+        </p>
+      ) : null}
+
+      {state.status === "success" && state.sessions.length === 0 ? (
+        <p className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+          No sessions found.
+        </p>
+      ) : null}
+
+      {state.status === "success" && state.sessions.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {state.sessions.map((session) => (
+            <li
+              className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+              key={session.id}
+            >
+              <div className="min-w-0 space-y-1">
+                <p className="font-semibold text-zinc-950">{session.id}</p>
+                {session.title ? (
+                  <p className="text-sm text-zinc-700">{session.title}</p>
+                ) : null}
+                <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+                  <span>{session.status}</span>
+                  <span>{session.eventCount} events</span>
+                  <span>{session.screenshotCount} screenshot{session.screenshotCount !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+              <button
+                aria-label={`Delete session ${session.id}`}
+                className="shrink-0 rounded-md border border-rose-300 px-3 py-1.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={deletionState.status === "loading"}
+                onClick={() => onDelete(session.id)}
+                type="button"
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {deletionState.status !== "idle" ? (
+        <div
+          aria-live="polite"
+          className={`mt-3 rounded-md border p-3 text-sm ${
+            deletionState.status === "unavailable"
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-zinc-200 bg-zinc-50 text-zinc-800"
+          }`}
+        >
+          <p className="font-semibold text-zinc-950">{deletionState.message}</p>
+          {deletionState.result ? (
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+              <Metric
+                label="Session rows"
+                value={`${deletionState.result.deletedSessionRows} session row deleted`}
+              />
+              <Metric
+                label="Screenshot files"
+                value={`${deletionState.result.deletedScreenshotFiles} screenshot file deleted`}
+              />
+              <Metric
+                label="Artifact root"
+                value={deletionState.result.removedArtifactRoot ? "Removed" : "Kept"}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 export default App;

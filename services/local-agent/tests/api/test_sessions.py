@@ -330,6 +330,121 @@ def test_latest_session_screenshots_can_be_listed_and_deleted(tmp_path: Path) ->
     )
 
 
+def test_list_sessions_returns_newest_first_with_counts(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            screenshot_provider=StaticScreenshotProvider(),
+            recorder_poll_interval_seconds=0.01,
+            screenshot_interval_seconds=0.01,
+        )
+    )
+
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_list_old",
+            "started_at": "2026-05-06T09:14:00+05:30",
+            "title": "Older session",
+        },
+    )
+    client.post(
+        "/sessions/sess_api_list_old/terminal-events",
+        json={
+            "timestamp": "2026-05-06T09:14:30+05:30",
+            "command": "pnpm test",
+            "shell": "powershell",
+            "exit_code": 0,
+        },
+    )
+    client.post(
+        "/sessions/sess_api_list_old/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_list_new",
+            "started_at": "2026-05-06T10:14:00+05:30",
+            "title": "Newer session",
+        },
+    )
+    client.post(
+        "/sessions/sess_api_list_new/stop",
+        json={"stopped_at": "2026-05-06T10:15:00+05:30"},
+    )
+
+    response = client.get("/sessions")
+
+    assert response.status_code == 200
+    sessions = response.json()["sessions"]
+    assert [session["id"] for session in sessions] == [
+        "sess_api_list_new",
+        "sess_api_list_old",
+    ]
+    assert sessions[0]["title"] == "Newer session"
+    assert sessions[0]["status"] == "stopped"
+    assert sessions[0]["event_count"] == 1
+    assert sessions[0]["screenshot_count"] == 1
+    assert sessions[1]["event_count"] == 2
+    assert sessions[1]["screenshot_count"] == 1
+
+
+def test_delete_session_removes_rows_and_default_artifacts(tmp_path: Path) -> None:
+    session_id = "sess_api_delete_001"
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            screenshot_provider=StaticScreenshotProvider(),
+            recorder_poll_interval_seconds=0.01,
+            screenshot_interval_seconds=0.01,
+        )
+    )
+
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": session_id,
+            "started_at": "2026-05-06T09:14:00+05:30",
+        },
+    )
+    client.post(
+        f"/sessions/{session_id}/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+    client.post(f"/sessions/{session_id}/exports/markdown")
+    session_root = tmp_path / "sessions" / session_id
+
+    assert session_root.exists()
+
+    delete_response = client.delete(f"/sessions/{session_id}")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {
+        "deleted_session_rows": 1,
+        "deleted_screenshot_files": 1,
+        "missing_screenshot_files": 0,
+        "deleted_screenshot_rows": 1,
+        "removed_artifact_root": True,
+    }
+    assert session_root.exists() is False
+    assert all(
+        session["id"] != session_id for session in client.get("/sessions").json()["sessions"]
+    )
+    assert client.get(f"/sessions/{session_id}/folder").status_code == 404
+
+
+def test_delete_unknown_session_returns_safe_error(tmp_path: Path) -> None:
+    client = TestClient(create_app(db_path=tmp_path / "worktrace.sqlite"))
+
+    response = client.delete("/sessions/sess_missing")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Unknown session: sess_missing"}
+
+
 def test_latest_session_events_returns_most_recent_session_events(tmp_path: Path) -> None:
     client = TestClient(
         create_app(

@@ -291,6 +291,45 @@ def test_start_stop_list_and_delete_session_screenshots(tmp_path: Path) -> None:
     assert client.get("/sessions/sess_api_screenshot_001/screenshots").json()["screenshots"] == []
 
 
+def test_latest_session_screenshots_can_be_listed_and_deleted(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            db_path=tmp_path / "worktrace.sqlite",
+            active_window_provider=StaticActiveWindowProvider(),
+            screenshot_provider=StaticScreenshotProvider(),
+            recorder_poll_interval_seconds=0.01,
+            screenshot_interval_seconds=0.01,
+        )
+    )
+
+    client.post(
+        "/sessions/start",
+        json={
+            "session_id": "sess_api_screenshot_latest",
+            "started_at": "2026-05-06T09:14:00+05:30",
+        },
+    )
+    client.post(
+        "/sessions/sess_api_screenshot_latest/stop",
+        json={"stopped_at": "2026-05-06T09:15:00+05:30"},
+    )
+
+    screenshots_response = client.get("/sessions/latest/screenshots")
+
+    assert screenshots_response.status_code == 200
+    screenshots = screenshots_response.json()["screenshots"]
+    assert len(screenshots) == 1
+    assert screenshots[0]["session_id"] == "sess_api_screenshot_latest"
+
+    delete_response = client.delete("/sessions/latest/screenshots")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted_rows"] == 1
+    assert (
+        client.get("/sessions/sess_api_screenshot_latest/screenshots").json()["screenshots"] == []
+    )
+
+
 def test_latest_session_events_returns_most_recent_session_events(tmp_path: Path) -> None:
     client = TestClient(
         create_app(

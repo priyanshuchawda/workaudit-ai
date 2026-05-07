@@ -75,6 +75,41 @@ export type SessionFolderResult =
   | { status: "available"; message: string; path: string }
   | { status: "unavailable"; message: string; path: null };
 
+export type SessionScreenshot = {
+  id: string;
+  sessionId: string;
+  sourceEventId: string | null;
+  timestamp: string;
+  width: number;
+  height: number;
+  storedWidth: number;
+  storedHeight: number;
+  byteSize: number;
+  contentHash: string;
+  visualHash: string;
+  storagePath: string;
+};
+
+export type SessionScreenshotsResult =
+  | { status: "available"; message: string; screenshots: SessionScreenshot[] }
+  | { status: "unavailable"; message: string; screenshots: [] };
+
+export type ScreenshotDeletionResult =
+  | {
+      status: "available";
+      message: string;
+      deletedFiles: number;
+      missingFiles: number;
+      deletedRows: number;
+    }
+  | {
+      status: "unavailable";
+      message: string;
+      deletedFiles: 0;
+      missingFiles: 0;
+      deletedRows: 0;
+    };
+
 const SIDE_CAR_COMMANDS = {
   health: "get_sidecar_health",
   start: "start_sidecar",
@@ -87,6 +122,8 @@ const SIDE_CAR_COMMANDS = {
   exportSessionMarkdown: "export_session_markdown",
   exportSessionRawJson: "export_session_raw_json",
   sessionFolder: "get_session_folder",
+  sessionScreenshots: "get_session_screenshots",
+  deleteSessionScreenshots: "delete_session_screenshots",
 } as const;
 
 const UNHEALTHY_FALLBACK: SidecarHealth = {
@@ -112,6 +149,20 @@ const SESSION_FOLDER_FALLBACK: SessionFolderResult = {
   status: "unavailable",
   message: "Session folder bridge is unavailable.",
   path: null,
+};
+
+const SESSION_SCREENSHOTS_FALLBACK: SessionScreenshotsResult = {
+  status: "unavailable",
+  message: "Screenshot metadata bridge is unavailable.",
+  screenshots: [],
+};
+
+const SCREENSHOT_DELETION_FALLBACK: ScreenshotDeletionResult = {
+  status: "unavailable",
+  message: "Screenshot delete bridge is unavailable.",
+  deletedFiles: 0,
+  missingFiles: 0,
+  deletedRows: 0,
 };
 
 export async function getSidecarHealth(): Promise<SidecarHealth> {
@@ -199,6 +250,30 @@ export async function getSessionFolder(sessionId: string): Promise<SessionFolder
     return await invoke<SessionFolderResult>(SIDE_CAR_COMMANDS.sessionFolder, { sessionId });
   } catch {
     return SESSION_FOLDER_FALLBACK;
+  }
+}
+
+export async function getSessionScreenshots(
+  sessionId: string,
+): Promise<SessionScreenshotsResult> {
+  try {
+    return await invoke<SessionScreenshotsResult>(SIDE_CAR_COMMANDS.sessionScreenshots, {
+      sessionId,
+    });
+  } catch {
+    return SESSION_SCREENSHOTS_FALLBACK;
+  }
+}
+
+export async function deleteSessionScreenshots(
+  sessionId: string,
+): Promise<ScreenshotDeletionResult> {
+  try {
+    return await invoke<ScreenshotDeletionResult>(SIDE_CAR_COMMANDS.deleteSessionScreenshots, {
+      sessionId,
+    });
+  } catch {
+    return SCREENSHOT_DELETION_FALLBACK;
   }
 }
 

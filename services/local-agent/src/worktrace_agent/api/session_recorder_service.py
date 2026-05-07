@@ -179,10 +179,13 @@ class SessionRecorderService:
         return list_screenshots(self._connection, resolved_session_id)
 
     def delete_session_screenshots(self, *, session_id: str) -> ScreenshotDeletionResult:
+        resolved_session_id = self._resolve_session_id(session_id)
+        if resolved_session_id is None:
+            return ScreenshotDeletionResult(deleted_files=0, missing_files=0, deleted_rows=0)
         return delete_screenshots_for_session(
             self._connection,
-            session_id=session_id,
-            artifact_root=self._artifact_root_for_session_id(session_id),
+            session_id=resolved_session_id,
+            artifact_root=self._artifact_root_for_session_id(resolved_session_id),
         )
 
     def export_session_markdown_preview(self, *, session_id: str) -> SessionExportPreview:

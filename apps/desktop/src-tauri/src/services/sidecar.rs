@@ -150,6 +150,67 @@ pub struct SessionFolderResult {
     pub path: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionScreenshotsStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct SessionScreenshot {
+    pub id: String,
+    pub session_id: String,
+    pub source_event_id: Option<String>,
+    pub timestamp: String,
+    pub width: i64,
+    pub height: i64,
+    pub stored_width: i64,
+    pub stored_height: i64,
+    pub byte_size: i64,
+    pub content_hash: String,
+    pub visual_hash: String,
+    pub storage_path: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionScreenshotsResult {
+    pub status: SessionScreenshotsStatus,
+    pub message: String,
+    pub screenshots: Vec<SessionScreenshot>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScreenshotDeletionStatus {
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ScreenshotDeletionResult {
+    pub status: ScreenshotDeletionStatus,
+    pub message: String,
+    pub deleted_files: i64,
+    pub missing_files: i64,
+    pub deleted_rows: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarScreenshotsResponse {
+    screenshots: Vec<SessionScreenshot>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarScreenshotDeletionResponse {
+    deleted_files: i64,
+    missing_files: i64,
+    deleted_rows: i64,
+}
+
 #[derive(Debug, Deserialize)]
 struct SidecarEventsResponse {
     events: Vec<SidecarRawEvent>,
@@ -405,6 +466,83 @@ impl SidecarService {
         self.session_folder_from_base_url(session_id, &base_url)
     }
 
+    pub fn session_screenshots(&self, session_id: String) -> SessionScreenshotsResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_screenshots();
+        };
+
+        self.session_screenshots_from_base_url(session_id, &base_url)
+    }
+
+    pub fn session_screenshots_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> SessionScreenshotsResult {
+        if session_id.trim().is_empty() {
+            return unavailable_screenshots();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_screenshots();
+        };
+        let path = format!("/sessions/{}/screenshots", encode_path_segment(&session_id));
+        let Ok(body_text) = request_local_json(&endpoint, "GET", &path, None) else {
+            return unavailable_screenshots();
+        };
+        let Ok(response) = serde_json::from_str::<SidecarScreenshotsResponse>(&body_text) else {
+            return unavailable_screenshots();
+        };
+
+        SessionScreenshotsResult {
+            status: SessionScreenshotsStatus::Available,
+            message: "Screenshot metadata loaded.".to_string(),
+            screenshots: response
+                .screenshots
+                .into_iter()
+                .map(SessionScreenshot::redacted)
+                .collect(),
+        }
+    }
+
+    pub fn delete_session_screenshots(&self, session_id: String) -> ScreenshotDeletionResult {
+        let Some(base_url) = configured_base_url() else {
+            return unavailable_screenshot_deletion();
+        };
+
+        self.delete_session_screenshots_from_base_url(session_id, &base_url)
+    }
+
+    pub fn delete_session_screenshots_from_base_url(
+        &self,
+        session_id: String,
+        base_url: &str,
+    ) -> ScreenshotDeletionResult {
+        if session_id.trim().is_empty() {
+            return unavailable_screenshot_deletion();
+        }
+
+        let Some(endpoint) = LocalHttpEndpoint::parse(base_url) else {
+            return unavailable_screenshot_deletion();
+        };
+        let path = format!("/sessions/{}/screenshots", encode_path_segment(&session_id));
+        let Ok(body_text) = request_local_json(&endpoint, "DELETE", &path, None) else {
+            return unavailable_screenshot_deletion();
+        };
+        let Ok(response) = serde_json::from_str::<SidecarScreenshotDeletionResponse>(&body_text)
+        else {
+            return unavailable_screenshot_deletion();
+        };
+
+        ScreenshotDeletionResult {
+            status: ScreenshotDeletionStatus::Available,
+            message: "Screenshots deleted.".to_string(),
+            deleted_files: response.deleted_files,
+            missing_files: response.missing_files,
+            deleted_rows: response.deleted_rows,
+        }
+    }
+
     pub fn session_folder_from_base_url(
         &self,
         session_id: String,
@@ -599,6 +737,24 @@ fn unavailable_folder() -> SessionFolderResult {
     }
 }
 
+fn unavailable_screenshots() -> SessionScreenshotsResult {
+    SessionScreenshotsResult {
+        status: SessionScreenshotsStatus::Unavailable,
+        message: "Screenshot metadata bridge is unavailable.".to_string(),
+        screenshots: Vec::new(),
+    }
+}
+
+fn unavailable_screenshot_deletion() -> ScreenshotDeletionResult {
+    ScreenshotDeletionResult {
+        status: ScreenshotDeletionStatus::Unavailable,
+        message: "Screenshot delete bridge is unavailable.".to_string(),
+        deleted_files: 0,
+        missing_files: 0,
+        deleted_rows: 0,
+    }
+}
+
 impl RecorderSession {
     fn redacted(self) -> Self {
         Self {
@@ -624,6 +780,27 @@ impl SessionExportPreview {
                 .into_iter()
                 .map(|evidence_id| redact_text(&evidence_id))
                 .collect(),
+        }
+    }
+}
+
+impl SessionScreenshot {
+    fn redacted(self) -> Self {
+        Self {
+            id: redact_text(&self.id),
+            session_id: redact_text(&self.session_id),
+            source_event_id: self
+                .source_event_id
+                .map(|source_event_id| redact_text(&source_event_id)),
+            timestamp: redact_text(&self.timestamp),
+            width: self.width,
+            height: self.height,
+            stored_width: self.stored_width,
+            stored_height: self.stored_height,
+            byte_size: self.byte_size,
+            content_hash: redact_text(&self.content_hash),
+            visual_hash: redact_text(&self.visual_hash),
+            storage_path: redact_text(&self.storage_path),
         }
     }
 }

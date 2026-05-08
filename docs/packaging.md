@@ -122,6 +122,49 @@ The packaged sidecar executable was also started directly with
 temporary `WORKTRACE_DB_PATH`; `/health` returned `status: ok` and schema
 `003_ocr_results.sql`.
 
+## Installer install/run QA result
+
+On 2026-05-08, the following local installer QA passed on Windows:
+
+```powershell
+pnpm --dir apps/desktop package:sidecar
+pnpm --dir apps/desktop package:windows
+```
+
+The generated NSIS installer was installed silently into a temporary repo-local
+QA directory:
+
+```txt
+apps/desktop/src-tauri/target/installer-qa/WorkTraceAI
+```
+
+Installed files included:
+
+```txt
+uninstall.exe
+worktrace-desktop.exe
+worktrace-local-agent.exe
+```
+
+The installed `worktrace-desktop.exe` started and remained running for a
+six-second launch smoke window. The installed `worktrace-local-agent.exe` also
+started with `WORKTRACE_SIDECAR_HOST=127.0.0.1`, `WORKTRACE_SIDECAR_PORT=8891`,
+and a temporary `WORKTRACE_DB_PATH`; `/health` returned `status: ok` and schema
+`003_ocr_results.sql`.
+
+The smoke result is recorded in
+`docs/evidence/windows-installer-install-run-qa-2026-05-08.json`.
+
+Uninstall/cleanup caveat:
+
+- Silent uninstall exited `0`.
+- Directly launching the PyInstaller sidecar left a child
+  `worktrace-local-agent` process after the launcher process exited.
+- While that child process was running, silent uninstall left
+  `worktrace-local-agent.exe` behind.
+- The QA cleanup stopped the remaining process and removed the temporary QA
+  directory manually.
+
 ## Current limits
 
 - The installer is not code-signed.
@@ -129,9 +172,10 @@ temporary `WORKTRACE_DB_PATH`; `/health` returned `status: ok` and schema
   `package:sidecar` command has produced the target-triple sidecar executable
   before `package:windows` is run. The local Windows package build smoke has
   passed with that artifact present.
-- The configured sidecar launch path exists, and Packaging-ready sidecar binary lookup exists,
-  but installer install/run QA must be performed before claiming a release-ready
-  bundled sidecar installer.
+- The configured sidecar launch path exists, Packaging-ready sidecar binary
+  lookup exists, and installer install/run QA passed locally, but this is not a
+  release-ready bundled sidecar installer until signing, updater/release channel,
+  and installer cleanup behavior are reviewed.
 - The installer does not bundle local AI models.
 - The app is still a desktop shell and preview UI.
 - There is no updater configuration.

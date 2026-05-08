@@ -56,6 +56,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     )
     assert "default runtime state is unavailable" in readme
     assert "Python sidecar packaging is not bundled" in readme
+    assert "installer install/run QA passed locally" in readme
+    assert "Direct sidecar QA exposed a cleanup caveat" in readme
     assert "not a live Windows recording benchmark" in readme
     assert "not signed or production-distributed yet" in readme
 

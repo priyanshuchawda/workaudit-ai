@@ -40,7 +40,7 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "metadata-only model cache manager" in readme
     assert "does not perform network downloads or load models" in readme
     assert "localhost-only Ollama-style report runtime adapter" in readme
-    assert "no real local runtime smoke has been run" in readme
+    assert "tiny real local Gemma E2B smoke passed" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
     assert "deterministic Markdown/raw JSON export review" in readme
     assert (
@@ -116,6 +116,8 @@ def test_eval_results_document_reproducible_command_and_aggregate() -> None:
     assert "| aggregate | 1.00 | 1.00 | 1.00 | 0 | 0 |" in eval_results
     assert "deterministic estimates" in eval_results
     assert "not real Windows profiling" in eval_results
+    assert "Real Gemma E2B smoke" in eval_results
+    assert "not a quality benchmark" in eval_results
 
 
 def read_text(relative_path: str) -> str:

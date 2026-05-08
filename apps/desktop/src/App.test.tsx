@@ -722,6 +722,73 @@ test("shows model unavailable state and disables local AI report generation", as
   expect(within(exportPanel).getByRole("button", { name: "Generate local AI report" })).toBeDisabled();
 });
 
+test("shows model settings with localhost endpoint and unavailable reason", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+
+  render(<App />);
+
+  const settingsPanel = await screen.findByRole("region", { name: "Model settings" });
+
+  expect(within(settingsPanel).getByDisplayValue("http://127.0.0.1:11434")).toBeInTheDocument();
+  expect(within(settingsPanel).getByText("Gemma E2B")).toBeInTheDocument();
+  expect(within(settingsPanel).getByText("Default report model")).toBeInTheDocument();
+  expect(within(settingsPanel).getByText("Gemma E4B")).toBeInTheDocument();
+  expect(within(settingsPanel).getByText("Manual deep mode only")).toBeInTheDocument();
+  expect(
+    within(settingsPanel).getByText(
+      "Generate report unavailable because local AI report runtime is unavailable.",
+    ),
+  ).toBeInTheDocument();
+  expect(within(settingsPanel).queryByText(/full prompt/i)).not.toBeInTheDocument();
+  expect(within(settingsPanel).queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
+});
+
+test("model settings reject remote endpoints before report generation", async () => {
+  getSidecarHealthMock.mockResolvedValue(healthySidecar);
+  getSessionEventsMock.mockResolvedValue({
+    status: "available",
+    events: [
+      {
+        id: "evt_live_001",
+        timestamp: "2026-05-06T09:14:00+05:30",
+        app: "VS Code",
+        windowTitle: "workaudit-ai - App.tsx",
+        source: "active_window",
+        type: "active_window_changed",
+      },
+    ],
+  });
+  getAiReportStatusMock.mockResolvedValue(readyAiReportStatus);
+
+  render(<App />);
+
+  const settingsPanel = await screen.findByRole("region", { name: "Model settings" });
+  fireEvent.change(within(settingsPanel).getByLabelText("Local model endpoint"), {
+    target: { value: "http://192.168.1.10:11434" },
+  });
+
+  expect(within(settingsPanel).getByText("Remote model endpoints are blocked.")).toBeInTheDocument();
+  expect(
+    within(settingsPanel).getByText("Generate report unavailable because endpoint is not localhost."),
+  ).toBeInTheDocument();
+
+  const exportPanel = screen.getByRole("region", { name: "Export and report review" });
+  expect(within(exportPanel).getByRole("button", { name: "Generate local AI report" })).toBeDisabled();
+});
+
 test("generates a local AI report with evidence IDs and model metadata", async () => {
   getSidecarHealthMock.mockResolvedValue(healthySidecar);
   getSessionEventsMock.mockResolvedValue({

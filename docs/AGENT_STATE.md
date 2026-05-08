@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 12:46 local / 2026-05-08 07:16 UTC
+2026-05-08 13:07 local / 2026-05-08 07:37 UTC
 
 ## Current Issue
-#103 — Real Gemma E2B local smoke and AI report proof
+#105 — Desktop model settings and runtime status UI
 
 ## Current Branch
-feat/103-real-gemma-e2b-smoke
+codex/105-model-settings-ui
 
 ## Current Phase
-Implemented #103 Gemma E2B smoke script; real smoke passed; docs updating
+Implemented #105 model settings UI; full gate and browser smoke passed; self-reviewing diff
 
 ## Completed Since Last Update
 - Merged #95 via PR #96 and confirmed issue #95 is closed.
@@ -120,6 +120,16 @@ Implemented #103 Gemma E2B smoke script; real smoke passed; docs updating
 - Added regression coverage that the smoke path uses a longer timeout, then updated the smoke script timeout to 180 seconds.
 - Real smoke passed with `ollama version is 0.23.1`, model `gemma4:e2b`, evidence ID `evt_gemma_e2b_smoke_terminal`, and privacy leak count `0`.
 - Recorded smoke evidence at `docs/evidence/gemma-e2b-smoke-2026-05-08.json`.
+- Focused #103 tests and full Python/shared/desktop/Rust quality gate passed.
+- Opened PR #104 for #103, confirmed GitGuardian passed, merged PR #104 into `main`, and confirmed issue #103 is closed.
+- Created #105: Desktop model settings and runtime status UI.
+- Started branch `codex/105-model-settings-ui` from updated `main`.
+- Added red React tests for model settings rendering, localhost endpoint validation, remote endpoint rejection, disabled report generation, no prompt display, and no download button.
+- Confirmed red state with `pnpm test -- -t "model settings"` failing because the Model Settings region did not exist.
+- Implemented a desktop Model Settings panel with local endpoint input, localhost-only validation, Gemma E2B/E4B status cards, generate-unavailable reasons, and no prompt/download/start-server actions.
+- Focused model settings tests passed with `pnpm test -- -t "model settings"` (2 passed, 28 skipped).
+- Full #105 quality gate passed across Python, shared package, desktop, and Rust.
+- Browser smoke against local Vite app confirmed the Model Settings panel renders, shows the localhost endpoint/Gemma E2B, has no download button, and rejects `http://192.168.1.10:11434`.
 - Merged #93 via PR #94 and confirmed issue #93 is closed.
 - Created #95: Gemma E4B deep mode.
 - Started branch `feat/95-gemma-e4b-deep-mode` from updated `main`.
@@ -261,16 +271,9 @@ Implemented #103 Gemma E2B smoke script; real smoke passed; docs updating
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
 - `README.md`
-- `docs/eval-results.md`
-- `docs/evidence/gemma-e2b-smoke-2026-05-08.json`
-- `docs/models/gemma.md`
-- `docs/models/local_model_runtime.md`
-- `docs/superpowers/plans/2026-05-08-real-gemma-e2b-local-smoke.md`
-- `services/local-agent/scripts/smoke_gemma_e2b_report.py`
-- `services/local-agent/src/worktrace_agent/scripts/__init__.py`
-- `services/local-agent/src/worktrace_agent/scripts/smoke_gemma_e2b_report.py`
-- `services/local-agent/tests/test_gemma_e2b_smoke_script.py`
-- `services/local-agent/tests/test_portfolio_claim_discipline.py`
+- `docs/superpowers/plans/2026-05-08-model-settings-runtime-status-ui.md`
+- `apps/desktop/src/App.tsx`
+- `apps/desktop/src/App.test.tsx`
 - `services/local-agent/pyproject.toml` (user-confirmed dependency update)
 - `services/local-agent/uv.lock` (user-confirmed dependency update)
 
@@ -458,13 +461,13 @@ Implemented #103 Gemma E2B smoke script; real smoke passed; docs updating
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- Full #103 quality gate not run yet.
+- None for #105.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run focused #103 tests, then the full required Python/shared/desktop/Rust quality gate.
+Run `git diff --check`, self-review the #105 diff, then commit, push, open PR, wait for checks, and merge if green.
 
 ## Do Not Forget
 - No OCR before OCR issue.

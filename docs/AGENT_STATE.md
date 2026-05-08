@@ -1,27 +1,29 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 16:15 local / 2026-05-08 10:45 UTC
+2026-05-08 16:40 local / 2026-05-08 11:10 UTC
 
 ## Current Issue
-#115 — Windows installer install/run QA smoke
+#117 — Stop packaged sidecar process tree
 
 ## Current Branch
-feat/115-installer-qa-smoke
+feat/117-sidecar-process-tree-cleanup
 
 ## Current Phase
-Ran fresh Windows sidecar packaging, NSIS packaging, temp silent install, installed desktop launch smoke, installed sidecar health smoke, and cleanup; docs/evidence update pending full gate
+Implemented Windows process-tree cleanup for managed sidecar stop; focused Rust tests passed; full gate pending
 
 ## Current Verification
-- `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py -q` — failed as expected before docs update because README did not yet claim installer install/run QA.
-- `pnpm --dir apps/desktop package:sidecar` — passed and produced `apps/desktop/src-tauri/binaries/worktrace-local-agent-x86_64-pc-windows-msvc.exe`.
-- `pnpm --dir apps/desktop package:windows` — passed and produced `apps/desktop/src-tauri/target/release/bundle/nsis/WorkTrace AI_0.1.0_x64-setup.exe`.
-- Silent installer run into `apps/desktop/src-tauri/target/installer-qa/WorkTraceAI` exited `0`.
-- Installed `worktrace-desktop.exe` started and remained running for the six-second launch smoke window.
-- Installed `worktrace-local-agent.exe` started with localhost env and `/health` returned `status: ok`, schema `003_ocr_results.sql`.
-- Silent uninstall exited `0`, but the directly launched PyInstaller sidecar child kept `worktrace-local-agent.exe` behind until cleanup stopped the process and removed the temp QA directory.
+- `cd apps/desktop/src-tauri; cargo test sidecar_process_tree_kill_command --test sidecar_service` — failed as expected before implementation because `sidecar_process_tree_kill_command_for_test` did not exist.
+- `cd apps/desktop/src-tauri; cargo test sidecar_process_tree_kill_command --test sidecar_service` — passed after adding Windows process-tree kill command coverage.
+- `cd apps/desktop/src-tauri; cargo test configured_sidecar_process_can_start_and_stop_safely --test sidecar_service` — passed.
 
 ## Completed Since Last Update
+- Merged #115 via PR #116 and confirmed issue #115 is closed.
+- Created #117: Stop packaged sidecar process tree.
+- Started branch `feat/117-sidecar-process-tree-cleanup` from updated `main`.
+- Added red Rust coverage for Windows process-tree termination command construction.
+- Updated managed sidecar stop to attempt `taskkill /PID <pid> /T /F` before the existing `Child::kill`/`wait` fallback.
+- Recorded regression evidence at `docs/evidence/sidecar-process-tree-cleanup-2026-05-08.json`.
 - Merged #113 via PR #114 and confirmed issue #113 is closed.
 - Created #115: Windows installer install/run QA smoke.
 - Started branch `feat/115-installer-qa-smoke` from updated `main`.

@@ -165,6 +165,13 @@ Uninstall/cleanup caveat:
 - The QA cleanup stopped the remaining process and removed the temporary QA
   directory manually.
 
+Follow-up fix:
+
+- Tauri-managed sidecar stop now uses Windows process-tree cleanup
+  (`taskkill /PID <pid> /T /F`) before the normal `Child::kill`/`wait` fallback.
+- Regression evidence is recorded in
+  `docs/evidence/sidecar-process-tree-cleanup-2026-05-08.json`.
+
 ## Current limits
 
 - The installer is not code-signed.
@@ -175,7 +182,8 @@ Uninstall/cleanup caveat:
 - The configured sidecar launch path exists, Packaging-ready sidecar binary
   lookup exists, and installer install/run QA passed locally, but this is not a
   release-ready bundled sidecar installer until signing, updater/release channel,
-  and installer cleanup behavior are reviewed.
+  and another installer QA pass confirms the managed process-tree cleanup in the
+  packaged desktop path.
 - The installer does not bundle local AI models.
 - The app is still a desktop shell and preview UI.
 - There is no updater configuration.

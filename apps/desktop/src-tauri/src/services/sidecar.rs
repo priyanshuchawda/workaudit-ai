@@ -353,6 +353,12 @@ struct SidecarHealthResponse {
 #[derive(Clone, Debug)]
 pub struct SidecarService;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SidecarProcessKillCommand {
+    pub program: String,
+    pub args: Vec<String>,
+}
+
 impl SidecarService {
     pub fn health(&self) -> SidecarHealth {
         let Some(base_url) = configured_base_url() else {
@@ -1431,9 +1437,43 @@ fn stop_managed_sidecar() -> bool {
         return false;
     };
 
+    kill_sidecar_process_tree(child.id());
     let _ = child.kill();
     let _ = child.wait();
     true
+}
+
+fn kill_sidecar_process_tree(pid: u32) {
+    let command = sidecar_process_tree_kill_command(pid);
+    let _ = Command::new(command.program)
+        .args(command.args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+fn sidecar_process_tree_kill_command(pid: u32) -> SidecarProcessKillCommand {
+    if cfg!(windows) {
+        return SidecarProcessKillCommand {
+            program: "taskkill".to_string(),
+            args: vec![
+                "/PID".to_string(),
+                pid.to_string(),
+                "/T".to_string(),
+                "/F".to_string(),
+            ],
+        };
+    }
+
+    SidecarProcessKillCommand {
+        program: "kill".to_string(),
+        args: vec!["-TERM".to_string(), pid.to_string()],
+    }
+}
+
+pub fn sidecar_process_tree_kill_command_for_test(pid: u32) -> SidecarProcessKillCommand {
+    sidecar_process_tree_kill_command(pid)
 }
 
 fn managed_sidecar_process() -> &'static Mutex<Option<Child>> {

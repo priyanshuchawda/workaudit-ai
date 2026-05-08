@@ -14,10 +14,11 @@ use worktrace_desktop_lib::commands::sidecar::{
     resume_recording_session, start_recording_session, stop_recording_session,
 };
 use worktrace_desktop_lib::services::sidecar::{
-    resolve_sidecar_binary, sidecar_base_url_from_port, sidecar_launch_environment, AiReportStatus,
-    RecorderControlStatus, ScreenshotDeletionStatus, SessionDeletionStatus, SessionEventsStatus,
-    SessionExportStatus, SessionFolderStatus, SessionListStatus, SessionScreenshotsStatus,
-    SidecarService, SidecarStatus,
+    resolve_sidecar_binary, sidecar_base_url_from_port, sidecar_launch_environment,
+    sidecar_process_tree_kill_command_for_test, AiReportStatus, RecorderControlStatus,
+    ScreenshotDeletionStatus, SessionDeletionStatus, SessionEventsStatus, SessionExportStatus,
+    SessionFolderStatus, SessionListStatus, SessionScreenshotsStatus, SidecarService,
+    SidecarStatus,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -55,6 +56,19 @@ fn start_sidecar_launch_environment_is_local_only_and_deterministic() {
         "127.0.0.1".to_string()
     )));
     assert!(env.contains(&("WORKTRACE_SIDECAR_PORT".to_string(), "4567".to_string())));
+}
+
+#[test]
+fn sidecar_process_tree_kill_command_targets_windows_descendants() {
+    let command = sidecar_process_tree_kill_command_for_test(4321);
+
+    if cfg!(windows) {
+        assert_eq!(command.program, "taskkill");
+        assert_eq!(command.args, vec!["/PID", "4321", "/T", "/F"]);
+    } else {
+        assert_eq!(command.program, "kill");
+        assert_eq!(command.args, vec!["-TERM", "4321"]);
+    }
 }
 
 #[test]

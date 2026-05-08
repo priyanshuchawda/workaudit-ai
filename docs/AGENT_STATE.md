@@ -1,22 +1,33 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 15:25 local / 2026-05-08 09:55 UTC
+2026-05-08 16:15 local / 2026-05-08 10:45 UTC
 
 ## Current Issue
-#113 — faster-whisper local-path smoke
+#115 — Windows installer install/run QA smoke
 
 ## Current Branch
-feat/113-faster-whisper-smoke
+feat/115-installer-qa-smoke
 
 ## Current Phase
-Implemented skip-safe faster-whisper local-path smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
+Ran fresh Windows sidecar packaging, NSIS packaging, temp silent install, installed desktop launch smoke, installed sidecar health smoke, and cleanup; docs/evidence update pending full gate
 
 ## Current Verification
-- `cd services/local-agent; uv run --python 3.13 pytest tests/test_faster_whisper_smoke_script.py -q` — passed, 2 tests.
-- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_faster_whisper_local_path.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_FASTER_WHISPER_MODEL_PATH is not configured.`, and `privacy_leak_count: 0`.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py -q` — failed as expected before docs update because README did not yet claim installer install/run QA.
+- `pnpm --dir apps/desktop package:sidecar` — passed and produced `apps/desktop/src-tauri/binaries/worktrace-local-agent-x86_64-pc-windows-msvc.exe`.
+- `pnpm --dir apps/desktop package:windows` — passed and produced `apps/desktop/src-tauri/target/release/bundle/nsis/WorkTrace AI_0.1.0_x64-setup.exe`.
+- Silent installer run into `apps/desktop/src-tauri/target/installer-qa/WorkTraceAI` exited `0`.
+- Installed `worktrace-desktop.exe` started and remained running for the six-second launch smoke window.
+- Installed `worktrace-local-agent.exe` started with localhost env and `/health` returned `status: ok`, schema `003_ocr_results.sql`.
+- Silent uninstall exited `0`, but the directly launched PyInstaller sidecar child kept `worktrace-local-agent.exe` behind until cleanup stopped the process and removed the temp QA directory.
 
 ## Completed Since Last Update
+- Merged #113 via PR #114 and confirmed issue #113 is closed.
+- Created #115: Windows installer install/run QA smoke.
+- Started branch `feat/115-installer-qa-smoke` from updated `main`.
+- Added red claim-discipline coverage for the installer install/run QA proof.
+- Ran fresh sidecar packaging, Windows NSIS packaging, temp silent install, installed desktop launch smoke, installed sidecar `/health` smoke, silent uninstall, and cleanup.
+- Recorded local installer QA evidence at `docs/evidence/windows-installer-install-run-qa-2026-05-08.json`, including the cleanup caveat.
 - Merged #111 via PR #112 and confirmed issue #111 is closed.
 - Created #113: faster-whisper local-path smoke.
 - Started branch `feat/113-faster-whisper-smoke` from updated `main`.

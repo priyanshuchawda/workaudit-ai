@@ -40,6 +40,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "no real PaddleOCR pass has been recorded yet" in readme
     assert "metadata-only model cache manager" in readme
     assert "does not perform network downloads or load models" in readme
+    assert "Qwen3 embedding smoke command exists and skips safely here" in readme
+    assert "no real Qwen3 embedding pass has been recorded yet" in readme
     assert "localhost-only Ollama-style report runtime adapter" in readme
     assert "tiny real local Gemma E2B smoke passed" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme

@@ -126,3 +126,29 @@ Interpretation:
 - This is not a PaddleOCR recognition, latency, memory, or installer proof.
 - Normal recording and tests remain independent of PaddleOCR, and no model files
   are bundled or downloaded.
+
+## Qwen3 embedding smoke
+
+On 2026-05-08, the optional Qwen3 embedding smoke command was run on this
+Windows machine:
+
+```txt
+command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_embedding.py
+status: skipped
+model_name: Qwen/Qwen3-Embedding-0.6B
+endpoint: not_configured
+reason: WORKTRACE_QWEN_EMBEDDING_BASE_URL is not configured.
+privacy_leak_count: 0
+```
+
+The smoke result is recorded in
+`docs/evidence/qwen-embedding-smoke-2026-05-08.json`.
+
+Interpretation:
+
+- This proves the Qwen3 embedding smoke path is callable and skip-safe when no
+  local endpoint is configured.
+- This is not a Qwen3 embedding quality, latency, memory, vector-index, or model
+  server proof.
+- Normal recording and tests remain independent of Qwen embedding runtimes, and
+  no model files are bundled or downloaded.

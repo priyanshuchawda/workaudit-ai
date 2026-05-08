@@ -17,7 +17,10 @@ Current embedding adapter notes:
 - Localhost-only `/embed` adapter with fakeable JSON transport.
 - Redacted input payloads only.
 - Embeddings are retrieval helpers only; no claim generation without evidence IDs.
-- Real local runtime smoke, benchmarked vector index persistence, and model-server setup are deferred.
+- A skip-safe local-runtime smoke command exists and currently skips here because
+  `WORKTRACE_QWEN_EMBEDDING_BASE_URL` is not configured.
+- Real local runtime pass, benchmarked vector index persistence, and model-server
+  setup are deferred.
 
 Current selected-frame vision adapter notes:
 

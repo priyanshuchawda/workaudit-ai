@@ -1,22 +1,29 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 15:05 local / 2026-05-08 09:35 UTC
+2026-05-08 15:25 local / 2026-05-08 09:55 UTC
 
 ## Current Issue
-#111 — Qwen3-VL selected-frame local runtime smoke
+#113 — faster-whisper local-path smoke
 
 ## Current Branch
-feat/111-qwen3-vl-smoke
+feat/113-faster-whisper-smoke
 
 ## Current Phase
-Implemented skip-safe Qwen3-VL selected-frame smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
+Implemented skip-safe faster-whisper local-path smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
 
 ## Current Verification
-- `cd services/local-agent; uv run --python 3.13 pytest tests/test_qwen_vl_smoke_script.py -q` — passed, 2 tests.
-- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_vl_selected_frame.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_QWEN_VL_BASE_URL is not configured.`, and `privacy_leak_count: 0`.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_faster_whisper_smoke_script.py -q` — passed, 2 tests.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_faster_whisper_local_path.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_FASTER_WHISPER_MODEL_PATH is not configured.`, and `privacy_leak_count: 0`.
 
 ## Completed Since Last Update
+- Merged #111 via PR #112 and confirmed issue #111 is closed.
+- Created #113: faster-whisper local-path smoke.
+- Started branch `feat/113-faster-whisper-smoke` from updated `main`.
+- Read faster-whisper docs and inspected `worktrace_agent.capture.faster_whisper_runtime` plus existing audio transcription tests.
+- Added red tests for the faster-whisper smoke script unconfigured-model-path skip path and fake-local-path-runtime pass path; confirmed red on missing `worktrace_agent.scripts.smoke_faster_whisper_local_path`.
+- Implemented `scripts/smoke_faster_whisper_local_path.py` and `worktrace_agent.scripts.smoke_faster_whisper_local_path` with explicit local model path configuration, sanitized public JSON, fakeable recognizer, and no public raw audio bytes, transcript text, or absolute local paths.
+- Recorded local smoke evidence at `docs/evidence/faster-whisper-smoke-2026-05-08.json`; no local model path is configured, so this is skip-safe proof only, not a real faster-whisper runtime pass.
 - Merged #109 via PR #110 and confirmed issue #109 is closed.
 - Created #111: Qwen3-VL selected-frame local runtime smoke.
 - Started branch `feat/111-qwen3-vl-smoke` from updated `main`.

@@ -44,6 +44,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "no real Qwen3 embedding pass has been recorded yet" in readme
     assert "Qwen3-VL selected-frame smoke command exists and skips safely here" in readme
     assert "no real Qwen3-VL selected-frame pass has been recorded yet" in readme
+    assert "faster-whisper local-path smoke command exists and skips safely here" in readme
+    assert "no real faster-whisper pass has been recorded yet" in readme
     assert "localhost-only Ollama-style report runtime adapter" in readme
     assert "tiny real local Gemma E2B smoke passed" in readme
     assert "does not spy on terminals, keylog, or capture commands unless" in readme
@@ -123,6 +125,7 @@ def test_eval_results_document_reproducible_command_and_aggregate() -> None:
     assert "not real Windows profiling" in eval_results
     assert "Real Gemma E2B smoke" in eval_results
     assert "Qwen3-VL selected-frame smoke" in eval_results
+    assert "faster-whisper local-path smoke" in eval_results
     assert "not a quality benchmark" in eval_results
 
 

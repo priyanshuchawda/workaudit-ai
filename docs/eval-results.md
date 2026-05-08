@@ -178,3 +178,29 @@ Interpretation:
   server, or UI deep-analysis proof.
 - Normal recording and tests remain independent of Qwen3-VL runtimes, and no
   model files are bundled or downloaded.
+
+## faster-whisper local-path smoke
+
+On 2026-05-08, the optional faster-whisper local-path smoke command was run on
+this Windows machine:
+
+```txt
+command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_faster_whisper_local_path.py
+status: skipped
+model_name: base
+model_path: not_configured
+reason: WORKTRACE_FASTER_WHISPER_MODEL_PATH is not configured.
+privacy_leak_count: 0
+```
+
+The smoke result is recorded in
+`docs/evidence/faster-whisper-smoke-2026-05-08.json`.
+
+Interpretation:
+
+- This proves the faster-whisper smoke path is callable and skip-safe when no
+  explicit local model path is configured.
+- This is not a faster-whisper transcription quality, latency, memory, packaged
+  model, microphone capture, or installer proof.
+- Normal recording and tests remain independent of faster-whisper runtimes, and
+  no model files are bundled or downloaded.

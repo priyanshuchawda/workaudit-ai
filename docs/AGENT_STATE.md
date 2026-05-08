@@ -1,22 +1,29 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 14:10 local / 2026-05-08 08:40 UTC
+2026-05-08 15:05 local / 2026-05-08 09:35 UTC
 
 ## Current Issue
-#109 — Qwen3 embedding local runtime smoke
+#111 — Qwen3-VL selected-frame local runtime smoke
 
 ## Current Branch
-feat/109-qwen3-embedding-smoke
+feat/111-qwen3-vl-smoke
 
 ## Current Phase
-Implemented skip-safe Qwen3 embedding smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
+Implemented skip-safe Qwen3-VL selected-frame smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
 
 ## Current Verification
-- `cd services/local-agent; uv run --python 3.13 pytest tests/test_qwen_embedding_smoke_script.py -q` — passed, 2 tests.
-- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_embedding.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_QWEN_EMBEDDING_BASE_URL is not configured.`, and `privacy_leak_count: 0`.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_qwen_vl_smoke_script.py -q` — passed, 2 tests.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_vl_selected_frame.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_QWEN_VL_BASE_URL is not configured.`, and `privacy_leak_count: 0`.
 
 ## Completed Since Last Update
+- Merged #109 via PR #110 and confirmed issue #109 is closed.
+- Created #111: Qwen3-VL selected-frame local runtime smoke.
+- Started branch `feat/111-qwen3-vl-smoke` from updated `main`.
+- Read Qwen3-VL docs and inspected `worktrace_agent.ai.qwen_vl_runtime` plus existing selected-frame adapter tests.
+- Added red tests for the Qwen3-VL smoke script unconfigured-endpoint skip path and fake-localhost-runtime pass path; confirmed red on missing `worktrace_agent.scripts.smoke_qwen_vl_selected_frame`.
+- Implemented `scripts/smoke_qwen_vl_selected_frame.py` and `worktrace_agent.scripts.smoke_qwen_vl_selected_frame` with explicit endpoint configuration, sanitized public JSON, fakeable transport, and no public image bytes, data URLs, or full prompt text.
+- Recorded local smoke evidence at `docs/evidence/qwen-vl-smoke-2026-05-08.json`; no local endpoint is configured, so this is skip-safe proof only, not a real Qwen3-VL selected-frame runtime pass.
 - Merged #107 via PR #108 and confirmed issue #107 is closed.
 - Created #109: Qwen3 embedding local runtime smoke.
 - Started branch `feat/109-qwen3-embedding-smoke` from updated `main`.

@@ -30,6 +30,9 @@ Current selected-frame vision adapter notes:
 - Selected screenshot/frame evidence is required by the policy layer.
 - Likely secret-risk screens are refused before runtime calls.
 - Continuous VLM remains forbidden.
-- Real local Qwen3-VL smoke, desktop UI, bundled model files, and model-server setup are deferred.
+- A skip-safe local-runtime smoke command exists and currently skips here because
+  `WORKTRACE_QWEN_VL_BASE_URL` is not configured.
+- Real local Qwen3-VL pass, desktop UI, bundled model files, and model-server
+  setup are deferred.
 
 Future Qwen runtime work must remain selected-frame/manual only for vision and evidence-cited for text report behavior.

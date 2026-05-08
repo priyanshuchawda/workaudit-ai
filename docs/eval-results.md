@@ -152,3 +152,29 @@ Interpretation:
   server proof.
 - Normal recording and tests remain independent of Qwen embedding runtimes, and
   no model files are bundled or downloaded.
+
+## Qwen3-VL selected-frame smoke
+
+On 2026-05-08, the optional Qwen3-VL selected-frame smoke command was run on
+this Windows machine:
+
+```txt
+command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_vl_selected_frame.py
+status: skipped
+model_name: Qwen/Qwen3-VL-2B-Instruct
+endpoint: not_configured
+reason: WORKTRACE_QWEN_VL_BASE_URL is not configured.
+privacy_leak_count: 0
+```
+
+The smoke result is recorded in
+`docs/evidence/qwen-vl-smoke-2026-05-08.json`.
+
+Interpretation:
+
+- This proves the Qwen3-VL selected-frame smoke path is callable and skip-safe
+  when no local endpoint is configured.
+- This is not a Qwen3-VL image-understanding quality, latency, memory, model
+  server, or UI deep-analysis proof.
+- Normal recording and tests remain independent of Qwen3-VL runtimes, and no
+  model files are bundled or downloaded.

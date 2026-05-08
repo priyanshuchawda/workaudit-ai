@@ -75,3 +75,30 @@ passed
 - `model_called_during_recording = no` means the eval path did not mark any report model as called during a recording session.
 - `model_unavailable` proves the unavailable fallback row is represented without calling a model.
 - These numbers are not real Windows profiling and do not prove live recorder performance.
+
+## Real Gemma E2B smoke
+
+On 2026-05-08, a tiny local smoke passed against user-installed Ollama and the
+configured default Gemma E2B tag:
+
+```txt
+command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_gemma_e2b_report.py
+status: passed
+ollama_version: ollama version is 0.23.1
+model_name: gemma4:e2b
+evidence_ids: evt_gemma_e2b_smoke_terminal
+privacy_leak_count: 0
+```
+
+The smoke result is recorded in
+`docs/evidence/gemma-e2b-smoke-2026-05-08.json`.
+
+Interpretation:
+
+- This proves the existing localhost Ollama report adapter can produce a
+  Pydantic-validated, evidence-cited report from the installed `gemma4:e2b`
+  model on this Windows machine.
+- This is not a quality benchmark, memory benchmark, latency benchmark, or CI
+  requirement.
+- Models are still not loaded during recording, and normal tests still use fake
+  runtimes or skip-safe smoke behavior.

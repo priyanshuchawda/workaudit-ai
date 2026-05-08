@@ -29,6 +29,12 @@ For #97, WorkTrace adds a localhost-only Qwen3-VL selected-frame adapter for use
 
 For #99, WorkTrace adds an optional faster-whisper transcription adapter behind explicit audio opt-in. The adapter uses lazy runtime binding, keeps audio off by default, suppresses transcription in private mode, defaults metadata to CPU int8 `base`, and leaves Distil-Whisper manual-only until benchmarked. No model is downloaded, bundled, loaded during recording, or smoke-tested by default.
 
+For #103, a tiny real Gemma E2B smoke passed against user-installed Ollama
+`0.23.1` with installed tag `gemma4:e2b`. The smoke used the existing
+localhost-only Ollama report adapter and produced an evidence-cited report with
+privacy leak count `0`. This is not a benchmark, not a CI requirement, and not a
+model download/startup feature.
+
 #83 runtime budgets:
 
 - default mode context budget: 8192 tokens

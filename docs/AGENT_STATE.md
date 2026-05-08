@@ -1,16 +1,16 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 01:56 local / 2026-05-07 20:26 UTC
+2026-05-08 12:46 local / 2026-05-08 07:16 UTC
 
 ## Current Issue
-#101 — AI report eval benchmark
+#103 — Real Gemma E2B local smoke and AI report proof
 
 ## Current Branch
-feat/101-ai-report-eval-benchmark
+feat/103-real-gemma-e2b-smoke
 
 ## Current Phase
-Full #101 quality gate passed; self-reviewing diff before commit/PR
+Implemented #103 Gemma E2B smoke script; real smoke passed; docs updating
 
 ## Completed Since Last Update
 - Merged #95 via PR #96 and confirmed issue #95 is closed.
@@ -108,6 +108,18 @@ Full #101 quality gate passed; self-reviewing diff before commit/PR
 - Updated README/eval docs to state that AI report evals are fake-runtime proxy checks and not real Gemma runtime proof.
 - Focused #101 checks passed: `uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py tests/test_golden_sessions_eval.py tests/test_portfolio_claim_discipline.py -q` (17 passed) and `uv run --python 3.13 python scripts/evaluate_model.py`.
 - Full #101 quality gate passed across Python, shared package, desktop, and Rust.
+- Opened PR #102 for #101, confirmed GitGuardian passed, merged PR #102 into `main`, and confirmed issue #101 is closed.
+- Created #103: Real Gemma E2B local smoke and AI report proof.
+- Started branch `feat/103-real-gemma-e2b-smoke` from updated `main`.
+- Confirmed Ollama is installed (`ollama version is 0.23.1`) and `ollama list` shows both `gemma4:e2b` and `gemma4:e4b`.
+- User confirmed the current `services/local-agent/pyproject.toml` and `services/local-agent/uv.lock` dependency changes were intentional and may be included.
+- Wrote the #103 implementation plan at `docs/superpowers/plans/2026-05-08-real-gemma-e2b-local-smoke.md`.
+- Added red tests for the Gemma E2B smoke script skip/pass behavior and confirmed red state on missing `worktrace_agent.scripts.smoke_gemma_e2b_report`.
+- Implemented a skip-safe Gemma E2B smoke script using fixed `ollama --version` / `ollama list` commands, the existing localhost-only Ollama report adapter, evidence-cited report validation, and safe JSON output without prompt text.
+- First real smoke failed safely with privacy leak count `0`; root cause was the 30-second runtime timeout during local model generation.
+- Added regression coverage that the smoke path uses a longer timeout, then updated the smoke script timeout to 180 seconds.
+- Real smoke passed with `ollama version is 0.23.1`, model `gemma4:e2b`, evidence ID `evt_gemma_e2b_smoke_terminal`, and privacy leak count `0`.
+- Recorded smoke evidence at `docs/evidence/gemma-e2b-smoke-2026-05-08.json`.
 - Merged #93 via PR #94 and confirmed issue #93 is closed.
 - Created #95: Gemma E4B deep mode.
 - Started branch `feat/95-gemma-e4b-deep-mode` from updated `main`.
@@ -249,12 +261,18 @@ Full #101 quality gate passed; self-reviewing diff before commit/PR
 ## Current Local Changes
 - `docs/AGENT_STATE.md`
 - `README.md`
-- `docs/evals.md`
 - `docs/eval-results.md`
-- `docs/superpowers/plans/2026-05-08-ai-report-eval-benchmark.md`
-- `services/local-agent/scripts/evaluate_model.py`
-- `services/local-agent/src/worktrace_agent/evals/ai_report_benchmark.py`
-- `services/local-agent/tests/test_ai_report_eval_benchmark.py`
+- `docs/evidence/gemma-e2b-smoke-2026-05-08.json`
+- `docs/models/gemma.md`
+- `docs/models/local_model_runtime.md`
+- `docs/superpowers/plans/2026-05-08-real-gemma-e2b-local-smoke.md`
+- `services/local-agent/scripts/smoke_gemma_e2b_report.py`
+- `services/local-agent/src/worktrace_agent/scripts/__init__.py`
+- `services/local-agent/src/worktrace_agent/scripts/smoke_gemma_e2b_report.py`
+- `services/local-agent/tests/test_gemma_e2b_smoke_script.py`
+- `services/local-agent/tests/test_portfolio_claim_discipline.py`
+- `services/local-agent/pyproject.toml` (user-confirmed dependency update)
+- `services/local-agent/uv.lock` (user-confirmed dependency update)
 
 ## Tests Run
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_ai_report_eval_benchmark.py -q` — failed as expected because `worktrace_agent.evals.ai_report_benchmark` was not implemented yet.
@@ -274,6 +292,12 @@ Full #101 quality gate passed; self-reviewing diff before commit/PR
 - `cd apps/desktop/src-tauri; cargo fmt --all -- --check` — passed.
 - `cd apps/desktop/src-tauri; cargo clippy --workspace --all-targets -- -D warnings` — passed.
 - `cd apps/desktop/src-tauri; cargo test --workspace` — passed.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_e2b_smoke_script.py -q` — failed as expected because `worktrace_agent.scripts.smoke_gemma_e2b_report` was not implemented yet.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_e2b_smoke_script.py -q` — passed, 3 tests after smoke script implementation.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_gemma_e2b_report.py` — failed safely first with `status: failed`, `reason: Local report generation failed safely.`, and privacy leak count `0`.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_e2b_smoke_script.py -q` — failed as expected after adding the longer-timeout regression.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_gemma_e2b_smoke_script.py -q` — passed, 3 tests after setting the smoke timeout to 180 seconds.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_gemma_e2b_report.py` — passed with Ollama `0.23.1`, model `gemma4:e2b`, evidence ID `evt_gemma_e2b_smoke_terminal`, and privacy leak count `0`.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — failed as expected because `ScreenshotArtifactFormat` and `ScreenshotRetentionConfig` are not implemented yet.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_screenshot_sampler.py tests/test_screenshot_capture_worker.py tests/test_screenshot_retention.py -q` — passed, 15 tests.
 - `cd services/local-agent; uv run --python 3.13 pytest tests/test_portfolio_claim_discipline.py -q` — passed, 6 tests.
@@ -434,13 +458,13 @@ Full #101 quality gate passed; self-reviewing diff before commit/PR
 - `git diff --check` — passed.
 
 ## Tests Not Run
-- Packaging gates not run for #101 because this eval-only change does not affect sidecar or Windows packaging.
+- Full #103 quality gate not run yet.
 
 ## Known Blockers
 - None currently.
 
 ## Next Exact Step
-Run `git diff --check`, self-review the #101 diff, then commit, push, open PR, wait for checks, and merge if green.
+Run focused #103 tests, then the full required Python/shared/desktop/Rust quality gate.
 
 ## Do Not Forget
 - No OCR before OCR issue.

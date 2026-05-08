@@ -1,22 +1,29 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 13:45 local / 2026-05-08 08:15 UTC
+2026-05-08 14:10 local / 2026-05-08 08:40 UTC
 
 ## Current Issue
-#107 — PaddleOCR real sample screenshot smoke
+#109 — Qwen3 embedding local runtime smoke
 
 ## Current Branch
-codex/107-paddleocr-real-smoke
+feat/109-qwen3-embedding-smoke
 
 ## Current Phase
-Implemented skip-safe PaddleOCR sample smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
+Implemented skip-safe Qwen3 embedding smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
 
 ## Current Verification
-- `cd services/local-agent; uv run --python 3.13 pytest tests/test_paddleocr_smoke_script.py -q` — passed, 2 tests.
-- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_paddleocr_sample.py` — exited 0 with `status: skipped`, `reason: OCR runtime provider paddleocr is not installed. Recording continues without OCR.`, and `privacy_leak_count: 0`.
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_qwen_embedding_smoke_script.py -q` — passed, 2 tests.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_qwen_embedding.py` — exited 0 with `status: skipped`, `reason: WORKTRACE_QWEN_EMBEDDING_BASE_URL is not configured.`, and `privacy_leak_count: 0`.
 
 ## Completed Since Last Update
+- Merged #107 via PR #108 and confirmed issue #107 is closed.
+- Created #109: Qwen3 embedding local runtime smoke.
+- Started branch `feat/109-qwen3-embedding-smoke` from updated `main`.
+- Read Qwen embedding docs and inspected `worktrace_agent.ai.qwen_embedding_runtime` plus existing adapter tests.
+- Added red tests for the Qwen embedding smoke script unconfigured-endpoint skip path and fake-localhost-runtime pass path; confirmed red on missing `worktrace_agent.scripts.smoke_qwen_embedding`.
+- Implemented `scripts/smoke_qwen_embedding.py` and `worktrace_agent.scripts.smoke_qwen_embedding` with explicit endpoint configuration, sanitized public JSON, fakeable transport, and no public input text or vectors.
+- Recorded local smoke evidence at `docs/evidence/qwen-embedding-smoke-2026-05-08.json`; no local endpoint is configured, so this is skip-safe proof only, not a real embedding runtime pass.
 - Merged #105 via PR #106 and confirmed issue #105 is closed.
 - Created #107: PaddleOCR real sample screenshot smoke.
 - Started branch `codex/107-paddleocr-real-smoke` from updated `main`.

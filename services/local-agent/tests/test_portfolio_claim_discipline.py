@@ -36,7 +36,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "desktop privacy center, configurable blocklist UI" in readme
     assert "selective OCR runtime guardrails" in readme
     assert "PaddleOCR is not bundled, downloaded, or required" in readme
-    assert "no real OCR smoke has been run" in readme
+    assert "PaddleOCR sample smoke command exists and skips safely here" in readme
+    assert "no real PaddleOCR pass has been recorded yet" in readme
     assert "metadata-only model cache manager" in readme
     assert "does not perform network downloads or load models" in readme
     assert "localhost-only Ollama-style report runtime adapter" in readme

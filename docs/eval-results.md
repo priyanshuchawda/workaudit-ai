@@ -102,3 +102,27 @@ Interpretation:
   requirement.
 - Models are still not loaded during recording, and normal tests still use fake
   runtimes or skip-safe smoke behavior.
+
+## PaddleOCR sample smoke
+
+On 2026-05-08, the optional PaddleOCR sample smoke command was run on this
+Windows machine:
+
+```txt
+command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_paddleocr_sample.py
+status: skipped
+provider: paddleocr
+reason: OCR runtime provider paddleocr is not installed. Recording continues without OCR.
+privacy_leak_count: 0
+```
+
+The smoke result is recorded in
+`docs/evidence/paddleocr-smoke-2026-05-08.json`.
+
+Interpretation:
+
+- This proves the PaddleOCR smoke path is callable, local-sample based, and
+  skip-safe when the optional runtime is absent.
+- This is not a PaddleOCR recognition, latency, memory, or installer proof.
+- Normal recording and tests remain independent of PaddleOCR, and no model files
+  are bundled or downloaded.

@@ -1,18 +1,29 @@
 # Agent State
 
 ## Last Updated
-2026-05-08 13:07 local / 2026-05-08 07:37 UTC
+2026-05-08 13:45 local / 2026-05-08 08:15 UTC
 
 ## Current Issue
-#105 — Desktop model settings and runtime status UI
+#107 — PaddleOCR real sample screenshot smoke
 
 ## Current Branch
-codex/105-model-settings-ui
+codex/107-paddleocr-real-smoke
 
 ## Current Phase
-Implemented #105 model settings UI; full gate and browser smoke passed; self-reviewing diff
+Implemented skip-safe PaddleOCR sample smoke; focused tests and local smoke command passed/skipped as expected; full gate pending
+
+## Current Verification
+- `cd services/local-agent; uv run --python 3.13 pytest tests/test_paddleocr_smoke_script.py -q` — passed, 2 tests.
+- `cd services/local-agent; uv run --python 3.13 python scripts/smoke_paddleocr_sample.py` — exited 0 with `status: skipped`, `reason: OCR runtime provider paddleocr is not installed. Recording continues without OCR.`, and `privacy_leak_count: 0`.
 
 ## Completed Since Last Update
+- Merged #105 via PR #106 and confirmed issue #105 is closed.
+- Created #107: PaddleOCR real sample screenshot smoke.
+- Started branch `codex/107-paddleocr-real-smoke` from updated `main`.
+- Read `docs/models/ocr.md` and `docs/pp_ocr.md`, then inspected the existing lazy PaddleOCR adapter and selective OCR worker tests.
+- Added red tests for the PaddleOCR smoke script missing-runtime skip path and fake-runtime pass path; confirmed red on missing `worktrace_agent.scripts.smoke_paddleocr_sample`.
+- Implemented `scripts/smoke_paddleocr_sample.py` and `worktrace_agent.scripts.smoke_paddleocr_sample` with an embedded local PNG sample, public JSON output, evidence ID discipline, privacy leak counting, and skip-safe runtime availability.
+- Recorded the local smoke evidence at `docs/evidence/paddleocr-smoke-2026-05-08.json`; PaddleOCR is not installed locally, so this is skip-safe proof only, not a real recognition pass.
 - Merged #95 via PR #96 and confirmed issue #95 is closed.
 - Created #97: Qwen3-VL selected-frame vision.
 - Started branch `feat/97-qwen3-vl-selected-frame-vision` from updated `main`.

@@ -16,6 +16,9 @@ Current faster-whisper adapter notes:
 - The real faster-whisper binding requires an explicit local model path before import so it does not trigger faster-whisper model-size auto-download behavior.
 - Runtime availability/config helpers do not import `faster_whisper`, `torch`, `transformers`, or `ctranslate2`.
 - No faster-whisper model is bundled, downloaded, or started by WorkTrace.
-- No real faster-whisper smoke or CPU/RAM benchmark has been run for this adapter yet.
+- A skip-safe local-path smoke command exists and currently skips here because
+  `WORKTRACE_FASTER_WHISPER_MODEL_PATH` is not configured.
+- Real local faster-whisper pass, CPU/RAM benchmark, packaged model setup, and
+  UI controls are deferred.
 
 Future audio work must keep recording usable without audio models, require explicit opt-in, and avoid transcript claims unless evidence IDs are present.

@@ -175,6 +175,8 @@ const initialAiReportReviewState: AiReportReviewState = {
   generatedAt: null,
 };
 
+const defaultModelEndpoint = "http://127.0.0.1:11434";
+
 function App() {
   const [sidecarHealth, setSidecarHealth] = useState<SidecarHealth>(initialSidecarHealth);
   const [sessionEvents, setSessionEvents] = useState<SessionEventsResult>(initialSessionEvents);
@@ -197,6 +199,7 @@ function App() {
     useState<SessionBrowserState>(initialSessionBrowserState);
   const [sessionDeletion, setSessionDeletion] =
     useState<SessionDeletionState>(initialSessionDeletionState);
+  const [modelEndpoint, setModelEndpoint] = useState(defaultModelEndpoint);
   const sourceEvents: RawTimelineEvent[] =
     sessionEvents.status === "available" ? sessionEvents.events : rawTimelineSimulationEvents;
   const timelineEvents =
@@ -208,7 +211,12 @@ function App() {
     sessionEvents.status === "available" ? "Latest sidecar session" : "Fixture preview session";
   const reviewSessionId =
     recorderSession?.id ?? (sessionEvents.status === "available" ? "latest" : null);
-  const canRequestAiReport = Boolean(reviewSessionId) && recorderStatus !== "recording" && recorderStatus !== "paused";
+  const endpointValidation = validateLocalModelEndpoint(modelEndpoint);
+  const canRequestAiReport =
+    Boolean(reviewSessionId) &&
+    recorderStatus !== "recording" &&
+    recorderStatus !== "paused" &&
+    endpointValidation.isValid;
 
   const refreshSidecarHealth = useCallback(async () => {
     setSidecarHealth(initialSidecarHealth);
@@ -675,6 +683,13 @@ function App() {
           onDelete={handleDeleteSession}
           onRefresh={handleRefreshSessions}
           state={sessionBrowser}
+        />
+
+        <ModelSettingsPanel
+          aiReportState={aiReportReview}
+          endpoint={modelEndpoint}
+          endpointValidation={endpointValidation}
+          onEndpointChange={setModelEndpoint}
         />
 
         <section
@@ -1237,6 +1252,183 @@ function AiReportPreview({ report }: { report: AiReportResult["report"] }) {
 
 function claimText(claim: AiReportClaim) {
   return claim.text ?? claim.command ?? claim.title ?? claim.path ?? "Evidence-cited claim";
+}
+
+type ModelEndpointValidation = {
+  isValid: boolean;
+  message: string;
+  reason: string | null;
+};
+
+function ModelSettingsPanel({
+  aiReportState,
+  endpoint,
+  endpointValidation,
+  onEndpointChange,
+}: {
+  aiReportState: AiReportReviewState;
+  endpoint: string;
+  endpointValidation: ModelEndpointValidation;
+  onEndpointChange: (endpoint: string) => void;
+}) {
+  const runtimeReady = aiReportState.status === "ready" || aiReportState.status === "complete";
+  const unavailableReason = endpointValidation.reason
+    ? "Generate report unavailable because endpoint is not localhost."
+    : aiReportState.canGenerate
+      ? null
+      : unavailableReportReason(aiReportState);
+
+  return (
+    <section
+      aria-label="Model settings"
+      className="rounded-md border border-zinc-300 bg-white p-5 shadow-sm"
+    >
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+            Models
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-normal">Model settings</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-700">
+            Local runtime setup is explicit. The desktop never downloads models or starts a model
+            server from this panel.
+          </p>
+        </div>
+        <label
+          className="grid w-full gap-2 text-sm font-semibold text-zinc-800 lg:max-w-md"
+          htmlFor="model-endpoint"
+        >
+          Local model endpoint
+          <input
+            aria-label="Local model endpoint"
+            className={`rounded-md border px-3 py-2 text-sm font-normal text-zinc-950 outline-none focus:ring-2 ${
+              endpointValidation.isValid
+                ? "border-zinc-300 focus:ring-emerald-200"
+                : "border-rose-300 focus:ring-rose-200"
+            }`}
+            id="model-endpoint"
+            onChange={(event) => onEndpointChange(event.target.value)}
+            spellCheck={false}
+            type="url"
+            value={endpoint}
+          />
+          <span
+            className={`text-xs font-medium ${
+              endpointValidation.isValid ? "text-zinc-600" : "text-rose-700"
+            }`}
+          >
+            {endpointValidation.message}
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <ModelRuntimeCard
+          detail="Ollama-compatible HTTP runtime"
+          label="Local endpoint"
+          state={endpointValidation.isValid ? "Localhost only" : "Blocked"}
+          tone={endpointValidation.isValid ? "safe" : "blocked"}
+        />
+        <ModelRuntimeCard
+          detail="Default report model"
+          label="Gemma E2B"
+          state={runtimeReady ? "Ready" : "Unavailable"}
+          tone={runtimeReady ? "safe" : "pending"}
+        />
+        <ModelRuntimeCard
+          detail="Manual deep mode only"
+          label="Gemma E4B"
+          state="Manual"
+          tone="pending"
+        />
+      </div>
+
+      {unavailableReason ? (
+        <p
+          aria-live="polite"
+          className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950"
+        >
+          {unavailableReason}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ModelRuntimeCard({
+  detail,
+  label,
+  state,
+  tone,
+}: {
+  detail: string;
+  label: string;
+  state: string;
+  tone: "safe" | "pending" | "blocked";
+}) {
+  const toneClass =
+    tone === "safe"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+      : tone === "blocked"
+        ? "border-rose-300 bg-rose-50 text-rose-950"
+        : "border-zinc-200 bg-zinc-50 text-zinc-800";
+
+  return (
+    <article className={`rounded-md border p-4 ${toneClass}`}>
+      <p className="text-sm font-semibold tracking-normal">{label}</p>
+      <p className="mt-2 text-xl font-semibold tracking-normal">{state}</p>
+      <p className="mt-2 text-sm leading-6">{detail}</p>
+    </article>
+  );
+}
+
+function validateLocalModelEndpoint(endpoint: string): ModelEndpointValidation {
+  try {
+    const parsed = new URL(endpoint);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return {
+        isValid: false,
+        message: "Endpoint must use http or https.",
+        reason: "invalid_scheme",
+      };
+    }
+    if (!["127.0.0.1", "localhost", "::1"].includes(parsed.hostname)) {
+      return {
+        isValid: false,
+        message: "Remote model endpoints are blocked.",
+        reason: "remote_endpoint",
+      };
+    }
+    if (parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      return {
+        isValid: false,
+        message: "Endpoint must not include credentials, paths, queries, or fragments.",
+        reason: "invalid_shape",
+      };
+    }
+    return {
+      isValid: true,
+      message: "Ollama endpoint localhost.",
+      reason: null,
+    };
+  } catch {
+    return {
+      isValid: false,
+      message: "Endpoint must be a valid local URL.",
+      reason: "invalid_url",
+    };
+  }
+}
+
+function unavailableReportReason(aiReportState: AiReportReviewState): string {
+  if (aiReportState.status === "runtime_unavailable") {
+    return "Generate report unavailable because local AI report runtime is unavailable.";
+  }
+  const normalized = aiReportState.message.trim();
+  if (!normalized) {
+    return "Generate report unavailable because local AI report runtime is unavailable.";
+  }
+  return `Generate report unavailable because ${normalized.charAt(0).toLowerCase()}${normalized.slice(1)}`;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

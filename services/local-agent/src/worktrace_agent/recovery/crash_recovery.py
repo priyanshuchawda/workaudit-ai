@@ -88,15 +88,12 @@ def _count_events_by_session(
     if not session_ids:
         return {}
 
-    placeholders = ",".join("?" for _ in session_ids)
-    rows = connection.execute(
-        f"""
-        SELECT session_id, COUNT(*) AS event_count
-        FROM raw_events
-        WHERE session_id IN ({placeholders})
-        GROUP BY session_id
-        """,
-        session_ids,
-    ).fetchall()
-
-    return {str(row["session_id"]): int(row["event_count"]) for row in rows}
+    counts: dict[str, int] = {}
+    for session_id in session_ids:
+        row = connection.execute(
+            "SELECT COUNT(*) AS event_count FROM raw_events WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if row is not None and int(row["event_count"]) > 0:
+            counts[session_id] = int(row["event_count"])
+    return counts

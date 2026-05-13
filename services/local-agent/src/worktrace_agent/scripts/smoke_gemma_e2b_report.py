@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import subprocess
+import subprocess  # nosec B404
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol
@@ -23,7 +23,9 @@ from worktrace_agent.timeline.deterministic import build_deterministic_timeline
 SmokeStatus = Literal["passed", "skipped", "failed"]
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 SMOKE_GENERATED_AT = "2026-05-08T00:00:00+05:30"
-SMOKE_TIMEOUT_SECONDS = 180
+SMOKE_CONTEXT_BUDGET_TOKENS = 4096
+SMOKE_MAX_OUTPUT_TOKENS = 256
+SMOKE_TIMEOUT_SECONDS = 90
 
 
 class CommandRunner(Protocol):
@@ -106,6 +108,8 @@ def run_gemma_e2b_smoke(
     try:
         config = replace(
             build_gemma_report_runtime_config(base_url=base_url),
+            context_budget_tokens=SMOKE_CONTEXT_BUDGET_TOKENS,
+            max_output_tokens=SMOKE_MAX_OUTPUT_TOKENS,
             timeout_seconds=SMOKE_TIMEOUT_SECONDS,
         )
         report = generate_evidence_cited_report(
@@ -156,7 +160,7 @@ def _run_command(args: Sequence[str], timeout_seconds: int) -> CommandResult:
         list(args),
         capture_output=True,
         check=False,
-        shell=False,
+        shell=False,  # nosec B603
         text=True,
         timeout=timeout_seconds,
     )

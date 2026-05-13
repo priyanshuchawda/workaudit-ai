@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
+from worktrace_agent.ai.local_http import require_local_http_url
 from worktrace_agent.ai.model_availability import ModelAvailabilityConfig, ModelProvider
 from worktrace_agent.ai.vision_analysis import VisionAnalysisRequest, VisionAnalyzerResult
 from worktrace_agent.privacy.redaction import redact_json_value, redact_text
@@ -100,14 +101,15 @@ class UrllibQwenVlTransport:
         payload: dict[str, object],
         timeout_seconds: int,
     ) -> object:
+        safe_url = require_local_http_url(url)
         request = urllib.request.Request(
-            url,
+            safe_url,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # nosec B310
                 return json.loads(response.read().decode("utf-8"))
         except (OSError, urllib.error.URLError, json.JSONDecodeError) as error:
             raise QwenVlRuntimeError("Local Qwen-VL runtime failed safely.") from error

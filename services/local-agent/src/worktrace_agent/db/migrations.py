@@ -36,15 +36,15 @@ def apply_migrations(
 
         sql = migration_file.read_text(encoding="utf-8")
         safe_filename = migration_file.name.replace("'", "''")
+        migration_script = (
+            "BEGIN;\n"  # nosec B608
+            + sql
+            + "\nINSERT INTO schema_migrations (filename) VALUES ('"  # nosec B608
+            + safe_filename
+            + "');\nCOMMIT;\n"
+        )
         try:
-            connection.executescript(
-                f"""
-                BEGIN;
-                {sql}
-                INSERT INTO schema_migrations (filename) VALUES ('{safe_filename}');
-                COMMIT;
-                """
-            )
+            connection.executescript(migration_script)
         except sqlite3.Error:
             connection.rollback()
             raise

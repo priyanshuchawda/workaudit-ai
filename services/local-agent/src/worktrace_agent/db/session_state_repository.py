@@ -144,18 +144,16 @@ def list_sessions_by_status(
     if not status_values:
         return []
 
-    placeholders = ",".join("?" for _ in status_values)
+    selected_statuses = frozenset(status_values)
     rows = connection.execute(
-        f"""
+        """
         SELECT id, started_at, ended_at, status, title, storage_path, privacy_mode
         FROM sessions
-        WHERE status IN ({placeholders})
         ORDER BY started_at ASC, id ASC
-        """,
-        status_values,
+        """
     ).fetchall()
 
-    return [_session_from_row(row) for row in rows]
+    return [_session_from_row(row) for row in rows if str(row["status"]) in selected_statuses]
 
 
 def list_sessions(connection: sqlite3.Connection) -> list[SessionRecord]:

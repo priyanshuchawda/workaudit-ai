@@ -78,20 +78,23 @@ passed
 
 ## Real Gemma E2B smoke
 
-On 2026-05-08, a tiny local smoke passed against user-installed Ollama and the
-configured default Gemma E2B tag:
+On 2026-05-13, a bounded tiny local smoke passed against user-installed Ollama
+and the configured default Gemma E2B tag:
 
 ```txt
 command: cd services/local-agent; uv run --python 3.13 python scripts/smoke_gemma_e2b_report.py
 status: passed
-ollama_version: ollama version is 0.23.1
+ollama_version: ollama version is 0.23.2
 model_name: gemma4:e2b
 evidence_ids: evt_gemma_e2b_smoke_terminal
 privacy_leak_count: 0
+smoke_budget: timeout 90s, context 4096 tokens, output 256 tokens
 ```
 
 The smoke result is recorded in
-`docs/evidence/gemma-e2b-smoke-2026-05-08.json`.
+`docs/evidence/gemma-e2b-smoke-2026-05-13.json`. The older
+`docs/evidence/gemma-e2b-smoke-2026-05-08.json` result is retained for
+history.
 
 Interpretation:
 

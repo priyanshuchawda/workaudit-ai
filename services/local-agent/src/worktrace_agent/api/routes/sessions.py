@@ -261,7 +261,7 @@ async def ingest_terminal_command_event(
             session_id=session_id,
             timestamp=request_body.timestamp,
             command=request_body.command,
-            shell=request_body.shell,
+            shell=request_body.shell,  # nosec B604
             exit_code=request_body.exit_code,
         )
     except sqlite3.Error as error:

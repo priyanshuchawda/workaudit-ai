@@ -59,7 +59,8 @@ def test_readme_has_two_minute_viewer_section_and_current_limits() -> None:
     assert "installer install/run QA passed locally" in readme
     assert "Direct sidecar QA exposed a cleanup caveat" in readme
     assert "Tauri-managed sidecar stop now uses Windows process-tree cleanup" in readme
-    assert "not a live Windows recording benchmark" in readme
+    assert "not a 30-minute production recording benchmark" in readme
+    assert "short 5-10 minute live laptop readiness smoke" in readme
     assert "not signed or production-distributed yet" in readme
 
 

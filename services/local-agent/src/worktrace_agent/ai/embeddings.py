@@ -86,7 +86,7 @@ def embed_command_input(
         timestamp=command.timestamp,
         command=redacted_command,
         command_hash=_hash_command(command.command),
-        shell=command.shell,
+        shell=command.shell,  # nosec B604
         embedding=embedding,
         model_name=require_non_empty(model.model_name, "model_name"),
         model_version=model.model_version,

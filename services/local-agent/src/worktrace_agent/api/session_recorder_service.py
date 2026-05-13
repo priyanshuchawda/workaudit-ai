@@ -46,6 +46,19 @@ from worktrace_agent.exporters.markdown import export_session_markdown
 from worktrace_agent.exporters.raw_json import export_redacted_raw_json
 from worktrace_agent.privacy.policy import PrivacyPolicy
 
+SESSION_COUNT_QUERIES = {
+    "raw_events": """
+        SELECT session_id, COUNT(*) AS row_count
+        FROM raw_events
+        GROUP BY session_id
+    """,
+    "screenshots": """
+        SELECT session_id, COUNT(*) AS row_count
+        FROM screenshots
+        GROUP BY session_id
+    """,
+}
+
 EXPORT_PREVIEW_MAX_CHARS = 4_000
 
 
@@ -211,7 +224,7 @@ class SessionRecorderService:
             session_id=session_id,
             timestamp=timestamp,
             command=command,
-            shell=shell,
+            shell=shell,  # nosec B604
             exit_code=exit_code,
         )
         append_raw_event(self._connection, event)
@@ -333,15 +346,10 @@ class SessionRecorderService:
         return [event.id for event in list_raw_events(self._connection, session_id)]
 
     def _count_rows_by_session(self, table_name: str) -> dict[str, int]:
-        if table_name not in {"raw_events", "screenshots"}:
+        query = SESSION_COUNT_QUERIES.get(table_name)
+        if query is None:
             raise ValueError("Unsupported session count table")
-        rows = self._connection.execute(
-            f"""
-            SELECT session_id, COUNT(*) AS row_count
-            FROM {table_name}
-            GROUP BY session_id
-            """
-        ).fetchall()
+        rows = self._connection.execute(query).fetchall()
         return {str(row["session_id"]): int(row["row_count"]) for row in rows}
 
     def _active_process_name(self) -> str | None:

@@ -42,7 +42,7 @@ SECRET_RISK_MARKERS = (
 
 class VisionAnalysisStatus(StrEnum):
     SKIPPED_NOT_SELECTED = "skipped_not_selected"
-    REFUSED_SECRET_RISK = "refused_secret_risk"
+    REFUSED_SECRET_RISK = "refused_secret_risk"  # nosec B105
     CANCELLED = "cancelled"
     ANALYZED = "analyzed"
     FAILED = "failed"
@@ -50,7 +50,7 @@ class VisionAnalysisStatus(StrEnum):
 
 class VisionFailureCategory(StrEnum):
     NOT_SELECTED = "not_selected"
-    SECRET_RISK = "secret_risk"
+    SECRET_RISK = "secret_risk"  # nosec B105
     CANCELLED = "cancelled"
     ANALYZER_FAILED = "analyzer_failed"
 

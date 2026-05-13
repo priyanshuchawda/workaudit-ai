@@ -89,7 +89,9 @@ def test_gemma_e2b_smoke_passes_with_fake_runtime_and_hides_prompt() -> None:
     assert result.report_summary == "The local Gemma E2B smoke cited session evidence."
     assert factory.configs[0].base_url == "http://127.0.0.1:11434"
     assert factory.configs[0].model_name == "gemma4:e2b"
-    assert factory.configs[0].timeout_seconds >= 120
+    assert factory.configs[0].timeout_seconds == 90
+    assert factory.configs[0].max_output_tokens == 256
+    assert factory.configs[0].context_budget_tokens == 4096
     assert "Known evidence" not in serialized
     assert "prompt" not in serialized.lower()
 

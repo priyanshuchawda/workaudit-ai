@@ -10,6 +10,7 @@ from worktrace_agent.ai.local_report_runtime import (
     LocalReportRuntimeConfig,
     LocalReportRuntimeError,
     OllamaReportModel,
+    UrllibJsonPostTransport,
 )
 from worktrace_agent.ai.reporting import generate_evidence_cited_report
 from worktrace_agent.domain.raw_event import RawEvent, build_raw_event
@@ -40,6 +41,17 @@ def test_ollama_report_runtime_rejects_non_localhost_base_url() -> None:
                 model_name="gemma-local",
             ),
             transport=FakeTransport({"response": valid_report_json()}),
+        )
+
+
+def test_urllib_report_transport_rejects_non_http_url_before_request() -> None:
+    transport = UrllibJsonPostTransport()
+
+    with pytest.raises(ValueError, match="local HTTP"):
+        transport.post_json(
+            url="file:///tmp/local-report-response.json",
+            payload={"prompt": "redacted evidence prompt"},
+            timeout_seconds=1,
         )
 
 

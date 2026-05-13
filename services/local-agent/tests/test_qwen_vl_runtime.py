@@ -14,6 +14,7 @@ from worktrace_agent.ai.qwen_vl_runtime import (
     QwenVlRuntimeConfig,
     QwenVlRuntimeError,
     QwenVlSelectedFrameAnalyzer,
+    UrllibQwenVlTransport,
     build_qwen_vl_availability_config,
     build_qwen_vl_runtime_config,
 )
@@ -44,6 +45,17 @@ def test_qwen_vl_runtime_rejects_non_local_or_path_base_urls(base_url: str) -> N
         QwenVlSelectedFrameAnalyzer(
             config=QwenVlRuntimeConfig(base_url=base_url),
             transport=FakeTransport(valid_chat_response()),
+        )
+
+
+def test_urllib_qwen_vl_transport_rejects_non_http_url_before_request() -> None:
+    transport = UrllibQwenVlTransport()
+
+    with pytest.raises(ValueError, match="local HTTP"):
+        transport.post_json(
+            url="file:///tmp/qwen-vl-response.json",
+            payload={"messages": []},
+            timeout_seconds=1,
         )
 
 

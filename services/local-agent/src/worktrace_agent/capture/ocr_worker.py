@@ -32,7 +32,7 @@ class OcrSkipReason(StrEnum):
     UNCHANGED = "unchanged"
     NOT_HIGH_VALUE = "not_high_value"
     PRIVACY_POLICY = "privacy_policy"
-    SECRET_RISK = "secret_risk"
+    SECRET_RISK = "secret_risk"  # nosec B105
     SESSION_LIMIT = "session_limit"
     RUNTIME_FAILED = "runtime_failed"
 

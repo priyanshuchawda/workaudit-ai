@@ -24,6 +24,7 @@ from worktrace_agent.ai.qwen_embedding_runtime import (
     QwenEmbeddingRuntime,
     QwenEmbeddingRuntimeConfig,
     QwenEmbeddingRuntimeError,
+    UrllibEmbeddingTransport,
     build_qwen_embedding_availability_config,
 )
 from worktrace_agent.privacy.redaction import (
@@ -52,6 +53,17 @@ def test_qwen_embedding_runtime_rejects_non_localhost_endpoint() -> None:
                 output_dimension=32,
             ),
             transport=FakeEmbeddingTransport(vectors=[vec32(1.0)]),
+        )
+
+
+def test_urllib_embedding_transport_rejects_non_http_url_before_request() -> None:
+    transport = UrllibEmbeddingTransport()
+
+    with pytest.raises(ValueError, match="local HTTP"):
+        transport.post_json(
+            url="file:///tmp/qwen-embedding-response.json",
+            payload={"inputs": ["redacted command"]},
+            timeout_seconds=1,
         )
 
 

@@ -20,7 +20,7 @@ SECRET_VALUES = (
     "mysecret",
 )
 
-REDACTION_TOKEN = "[REDACTED]"
+REDACTION_TOKEN = "[REDACTED]"  # nosec B105
 
 SECRET_ASSIGNMENT_PATTERN = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD|PASS|KEY)[A-Z0-9_]*=)([^\s;&|]+)"
